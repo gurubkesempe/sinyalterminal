@@ -269,7 +269,7 @@ async function fetchPair(pair){
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - 130);
-  const url = `https://api.frankfurter.app/${fmtDate(start)}..${fmtDate(end)}?from=${pair.base}&to=${pair.quote}`;
+  const url = `https://api.frankfurter.dev/v1/${fmtDate(start)}..${fmtDate(end)}?from=${pair.base}&to=${pair.quote}`;
   const res = await fetch(url);
   if(!res.ok) throw new Error("Gagal ambil data " + pair.label);
   const data = await res.json();
