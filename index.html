@@ -28,7 +28,6 @@
   }
   .wrap{ max-width: 1180px; margin: 0 auto; }
 
-  /* ---- Header ---- */
   header{
     display:flex; justify-content:space-between; align-items:flex-end;
     flex-wrap: wrap; gap: 16px;
@@ -43,7 +42,6 @@
   .live-dot{
     width:8px; height:8px; border-radius:50%;
     background: var(--bull);
-    box-shadow: 0 0 0 0 rgba(22,199,132,0.6);
     animation: pulse 2s infinite;
   }
   @keyframes pulse{
@@ -52,24 +50,7 @@
     100%{ box-shadow: 0 0 0 0 rgba(22,199,132,0); }
   }
   .title-block p{ color: var(--text-dim); font-size: 13px; margin-top: 6px; }
-  .meta{ text-align:right; font-family:'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
-  .meta span{ color: var(--text); }
-  button#refreshBtn{
-    margin-top: 8px;
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    color: var(--text);
-    font-family:'JetBrains Mono', monospace;
-    font-size: 12px;
-    padding: 7px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: border-color .15s ease, color .15s ease;
-  }
-  button#refreshBtn:hover{ border-color: var(--accent); color: var(--accent); }
-  button#refreshBtn:disabled{ opacity: .5; cursor: default; }
 
-  /* ---- Disclaimer ---- */
   .disclaimer{
     background: rgba(240,185,11,0.06);
     border: 1px solid rgba(240,185,11,0.25);
@@ -78,29 +59,76 @@
     line-height: 1.6;
     padding: 12px 16px;
     border-radius: 8px;
-    margin-bottom: 24px;
+    margin-bottom: 26px;
   }
 
-  /* ---- Grid ---- */
+  /* ---- Section headers ---- */
+  .section{ margin-bottom: 34px; }
+  .section-head{
+    display:flex; justify-content:space-between; align-items:center;
+    flex-wrap: wrap; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .section-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 700;
+    display:flex; align-items:center; gap:8px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .section-title .tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 10px;
+    text-transform: none; letter-spacing: 0;
+  }
+  .tag.live{ background: rgba(22,199,132,0.12); color: var(--bull); }
+  .tag.delayed{ background: rgba(240,185,11,0.1); color: var(--watch); }
+
+  .section-meta{ font-family:'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
+  .section-meta span{ color: var(--text); }
+
+  /* ---- API key box ---- */
+  .keybox{
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
+    display:flex; gap: 10px; align-items:center; flex-wrap: wrap;
+  }
+  .keybox p{ font-size: 12px; color: var(--text-dim); flex: 1 1 260px; line-height:1.5; }
+  .keybox a{ color: var(--accent); text-decoration:none; }
+  .keybox input{
+    background: #0d1015; border: 1px solid var(--panel-border); color: var(--text);
+    font-family:'JetBrains Mono', monospace; font-size: 12px;
+    padding: 8px 10px; border-radius: 6px; width: 220px;
+  }
+  .keybox button{
+    background: var(--accent); border:none; color:#0a0c10; font-weight:600;
+    font-family:'JetBrains Mono', monospace; font-size: 12px;
+    padding: 8px 14px; border-radius: 6px; cursor:pointer;
+  }
+  .keybox .status{ font-family:'JetBrains Mono', monospace; font-size: 11px; color: var(--bull); }
+
+  button.ghost{
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    font-family:'JetBrains Mono', monospace; font-size: 12px;
+    padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  button.ghost:hover{ border-color: var(--accent); color: var(--accent); }
+  button.ghost:disabled{ opacity:.5; cursor:default; }
+
+  /* ---- Grid / Cards ---- */
   .grid{
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
   }
   .card{
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 18px;
-    position: relative;
-    overflow: hidden;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 18px; position: relative; overflow: hidden;
     transition: border-color .2s ease;
   }
   .card:hover{ border-color: #2a3342; }
-  .card::before{
-    content:"";
-    position:absolute; top:0; left:0; right:0; height:2px;
-  }
+  .card::before{ content:""; position:absolute; top:0; left:0; right:0; height:2px; }
   .card.bull::before{ background: var(--bull); }
   .card.bear::before{ background: var(--bear); }
   .card.watch::before{ background: var(--watch); }
@@ -110,11 +138,8 @@
   .pair-sub{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
   .badge{
-    font-family:'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-    display:flex; align-items:center; gap: 6px;
+    font-family:'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap: 6px;
     letter-spacing: 0.04em;
   }
   .badge .dot{ width:6px; height:6px; border-radius:50%; }
@@ -125,36 +150,26 @@
   .badge.watch{ background: rgba(240,185,11,0.1); color: var(--watch); }
   .badge.watch .dot{ background: var(--watch); }
 
-  .price-row{ display:flex; align-items:baseline; gap:10px; margin-bottom: 14px; }
-  .price{ font-family:'JetBrains Mono', monospace; font-size: 26px; font-weight: 600; }
+  .price-row{ display:flex; align-items:baseline; gap:10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .price{ font-family:'JetBrains Mono', monospace; font-size: 24px; font-weight: 600; }
   .chg{ font-family:'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
   .chg.up{ color: var(--bull); }
   .chg.down{ color: var(--bear); }
 
-  .stats{
-    display:grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px; margin-bottom: 14px;
-  }
+  .stats{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
   .stat{ background: rgba(255,255,255,0.02); border-radius: 6px; padding: 8px 10px; }
   .stat-label{ font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
   .stat-value{ font-family:'JetBrains Mono', monospace; font-size: 13px; margin-top: 3px; }
 
-  .spark{ width: 100%; height: 48px; display:block; }
-
+  .spark{ width: 100%; height: 44px; display:block; }
   .note{ font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
 
-  .loading, .errbox{
-    grid-column: 1/-1;
-    text-align:center; padding: 50px 20px;
-    color: var(--text-dim);
-    font-family:'JetBrains Mono', monospace; font-size: 13px;
+  .loading, .errbox, .infobox{
+    grid-column: 1/-1; text-align:center; padding: 40px 20px;
+    color: var(--text-dim); font-family:'JetBrains Mono', monospace; font-size: 13px;
   }
   .errbox{ color: var(--bear); }
-  .errbox button{
-    margin-top: 14px; background: var(--panel); border:1px solid var(--panel-border);
-    color: var(--text); padding: 8px 16px; border-radius: 6px; cursor:pointer;
-    font-family:'JetBrains Mono', monospace;
-  }
+  .infobox{ background: var(--panel); border: 1px dashed var(--panel-border); border-radius: 8px; }
 
   footer{
     margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--panel-border);
@@ -163,7 +178,6 @@
 
   @media (max-width: 560px){
     header{ align-items:flex-start; }
-    .meta{ text-align:left; }
   }
 </style>
 </head>
@@ -175,43 +189,51 @@
       <h1><span class="live-dot"></span>Sinyal Terminal</h1>
       <p>Dashboard EMA 12/26 &amp; RSI 14 — bantu keputusan entry manual, bukan robot otomatis</p>
     </div>
-    <div class="meta">
-      <div>Update terakhir: <span id="lastUpdate">—</span></div>
-      <div>Sumber data: <span>Frankfurter (ECB, harian)</span></div>
-      <button id="refreshBtn" onclick="loadAll()">↻ Refresh data</button>
-    </div>
   </header>
 
   <div class="disclaimer">
-    ⚠️ Data harga di sini adalah kurs referensi <strong>harian</strong> (bukan real-time tick dari Exness), diperbarui sekali sehari sekitar jam 22:00 WIB. Cocok untuk bias arah swing/harian, <strong>bukan untuk scalping</strong>. Sinyal EMA/RSI di bawah adalah alat bantu baca momentum, bukan rekomendasi atau jaminan profit — selalu konfirmasi ulang di chart Exness/TradingView sebelum entry, dan gunakan stop loss.
+    ⚠️ Sinyal EMA/RSI di sini adalah alat bantu baca momentum, bukan rekomendasi atau jaminan profit. Selalu konfirmasi ulang di chart Exness sebelum entry, dan gunakan stop loss. Harga crypto real-time dari Binance; harga forex tergantung apakah kamu sudah pasang API key (lihat bagian Forex di bawah).
   </div>
 
-  <div class="grid" id="grid">
-    <div class="loading">Memuat data pasar…</div>
+  <!-- ===== CRYPTO SECTION ===== -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Crypto <span class="tag live">● live · Binance</span></div>
+      <div class="section-meta">Update tiap 30 detik · Terakhir: <span id="cryptoLastUpdate">—</span></div>
+    </div>
+    <div class="grid" id="cryptoGrid"><div class="loading">Memuat data crypto…</div></div>
+  </div>
+
+  <!-- ===== FOREX SECTION ===== -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Forex <span class="tag" id="forexTag">delayed · harian</span></div>
+      <div class="section-meta">Terakhir: <span id="forexLastUpdate">—</span></div>
+    </div>
+
+    <div class="keybox">
+      <p>
+        Mau update forex tiap beberapa menit (bukan cuma harian)? Pasang API key gratis dari
+        <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">Twelve Data</a> (daftar ~2 menit, gratis, tanpa kartu kredit).
+        Key disimpan di browser kamu sendiri saja.
+      </p>
+      <input type="text" id="apiKeyInput" placeholder="Tempel API key Twelve Data di sini">
+      <button onclick="saveApiKey()">Simpan</button>
+      <button class="ghost" id="clearKeyBtn" onclick="clearApiKey()" style="display:none;">Hapus key</button>
+      <span class="status" id="keyStatus"></span>
+    </div>
+
+    <div class="grid" id="forexGrid"><div class="loading">Memuat data forex…</div></div>
   </div>
 
   <footer>
-    Metodologi: EMA cepat (12) &amp; EMA lambat (26) dihitung dari ~90 hari kurs penutupan harian. Sinyal <strong>BUY</strong> muncul saat EMA12 baru saja memotong ke atas EMA26 dengan RSI(14) di atas 50. Sinyal <strong>SELL</strong> saat EMA12 memotong ke bawah EMA26 dengan RSI di bawah 50. Selain itu status menunjukkan <strong>WATCH</strong> (bias tren tanpa cross baru). Bukan nasihat keuangan.
+    Metodologi: EMA cepat (12) &amp; EMA lambat (26), plus RSI(14). Sinyal <strong>BUY</strong> = EMA12 baru saja memotong ke atas EMA26 dengan RSI di atas 50. Sinyal <strong>SELL</strong> = EMA12 memotong ke bawah EMA26 dengan RSI di bawah 50. <strong>BIAS NAIK/TURUN</strong> = tren berjalan tanpa cross baru hari ini. Crypto pakai candle 1 jam dari Binance (tanpa API key). Forex pakai candle 15 menit dari Twelve Data (kalau API key terpasang) atau kurs harian ECB via Frankfurter (kalau belum). Bukan nasihat keuangan.
   </footer>
 
 </div>
 
 <script>
-const PAIRS = [
-  { label: "EUR/USD", base: "EUR", quote: "USD" },
-  { label: "GBP/USD", base: "GBP", quote: "USD" },
-  { label: "USD/JPY", base: "USD", quote: "JPY" },
-  { label: "USD/CHF", base: "USD", quote: "CHF" },
-  { label: "AUD/USD", base: "AUD", quote: "USD" },
-  { label: "USD/CAD", base: "USD", quote: "CAD" },
-  { label: "NZD/USD", base: "NZD", quote: "USD" },
-];
-
-function fmtDate(d){
-  const iso = d.toISOString().slice(0,10);
-  return iso;
-}
-
+/* ============ Shared indicator math ============ */
 function calcEMA(values, period){
   const ema = new Array(values.length).fill(null);
   if(values.length < period) return ema;
@@ -220,12 +242,9 @@ function calcEMA(values, period){
   for(let i=0;i<period;i++) sma += values[i];
   sma /= period;
   ema[period-1] = sma;
-  for(let i=period;i<values.length;i++){
-    ema[i] = values[i]*k + ema[i-1]*(1-k);
-  }
+  for(let i=period;i<values.length;i++) ema[i] = values[i]*k + ema[i-1]*(1-k);
   return ema;
 }
-
 function calcRSI(values, period=14){
   const rsi = new Array(values.length).fill(null);
   if(values.length < period+1) return rsi;
@@ -234,84 +253,58 @@ function calcRSI(values, period=14){
     const diff = values[i]-values[i-1];
     if(diff>=0) gains+=diff; else losses-=diff;
   }
-  let avgGain = gains/period, avgLoss = losses/period;
-  rsi[period] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+  let avgGain=gains/period, avgLoss=losses/period;
+  rsi[period] = avgLoss===0 ? 100 : 100-(100/(1+(avgGain/avgLoss)));
   for(let i=period+1;i<values.length;i++){
     const diff = values[i]-values[i-1];
-    const gain = diff>0 ? diff : 0;
-    const loss = diff<0 ? -diff : 0;
+    const gain = diff>0?diff:0, loss = diff<0?-diff:0;
     avgGain = (avgGain*(period-1)+gain)/period;
     avgLoss = (avgLoss*(period-1)+loss)/period;
-    rsi[i] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+    rsi[i] = avgLoss===0 ? 100 : 100-(100/(1+(avgGain/avgLoss)));
   }
   return rsi;
 }
-
 function sparkSVG(values){
-  const w = 280, h = 48, pad = 4;
-  const min = Math.min(...values), max = Math.max(...values);
-  const range = (max-min) || 1;
-  const step = (w-pad*2) / (values.length-1);
+  const w=260, h=44, pad=4;
+  const min=Math.min(...values), max=Math.max(...values);
+  const range=(max-min)||1;
+  const step=(w-pad*2)/(values.length-1);
   const pts = values.map((v,i)=>{
-    const x = pad + i*step;
-    const y = h - pad - ((v-min)/range)*(h-pad*2);
+    const x = pad+i*step;
+    const y = h-pad-((v-min)/range)*(h-pad*2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
-  const last = values[values.length-1];
-  const up = last >= values[0];
+  const up = values[values.length-1] >= values[0];
   const color = up ? "var(--bull)" : "var(--bear)";
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
     <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
 }
-
-async function fetchPair(pair){
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 130);
-  const url = `https://api.frankfurter.dev/v1/${fmtDate(start)}..${fmtDate(end)}?from=${pair.base}&to=${pair.quote}`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Gagal ambil data " + pair.label);
-  const data = await res.json();
-  const dates = Object.keys(data.rates).sort();
-  const closes = dates.map(d => data.rates[d][pair.quote]);
-  return { dates, closes };
-}
-
-function buildCard(pair, dates, closes){
-  const emaFast = calcEMA(closes, 12);
-  const emaSlow = calcEMA(closes, 26);
-  const rsi = calcRSI(closes, 14);
-
+function signalFromSeries(closes){
+  const emaFast = calcEMA(closes,12), emaSlow = calcEMA(closes,26), rsi = calcRSI(closes,14);
   const n = closes.length;
-  const lastClose = closes[n-1];
-  const prevClose = closes[n-2];
-  const chg = ((lastClose - prevClose)/prevClose)*100;
-
-  const fLast = emaFast[n-1], sLast = emaSlow[n-1];
-  const fPrev = emaFast[n-2], sPrev = emaSlow[n-2];
-  const rLast = rsi[n-1];
-
-  let signal = "watch", label = "WATCH";
+  const fLast=emaFast[n-1], sLast=emaSlow[n-1], fPrev=emaFast[n-2], sPrev=emaSlow[n-2], rLast=rsi[n-1];
+  let signal="watch", label="WATCH";
   if(fLast!=null && sLast!=null && fPrev!=null && sPrev!=null){
-    const crossedUp = (fPrev <= sPrev) && (fLast > sLast);
-    const crossedDown = (fPrev >= sPrev) && (fLast < sLast);
-    if(crossedUp && rLast > 50){ signal="bull"; label="BUY"; }
-    else if(crossedDown && rLast < 50){ signal="bear"; label="SELL"; }
-    else if(fLast > sLast){ signal="watch"; label="BIAS NAIK"; }
+    const crossedUp = (fPrev<=sPrev) && (fLast>sLast);
+    const crossedDown = (fPrev>=sPrev) && (fLast<sLast);
+    if(crossedUp && rLast>50){ signal="bull"; label="BUY"; }
+    else if(crossedDown && rLast<50){ signal="bear"; label="SELL"; }
+    else if(fLast>sLast){ signal="watch"; label="BIAS NAIK"; }
     else { signal="watch"; label="BIAS TURUN"; }
   }
-
-  const decimals = pair.quote === "JPY" ? 3 : 5;
+  return { signal, label, fLast, sLast, rLast };
+}
+function cardHTML({name, sub, decimals, closes, lastLabel}){
+  const {signal,label,fLast,sLast,rLast} = signalFromSeries(closes);
+  const n = closes.length;
+  const lastClose = closes[n-1], prevClose = closes[n-2];
+  const chg = ((lastClose-prevClose)/prevClose)*100;
   const spark = sparkSVG(closes.slice(-30));
-
   return `
   <div class="card ${signal}">
     <div class="pair-row">
-      <div>
-        <div class="pair-name">${pair.label}</div>
-        <div class="pair-sub">Kurs referensi harian · ECB</div>
-      </div>
+      <div><div class="pair-name">${name}</div><div class="pair-sub">${sub}</div></div>
       <div class="badge ${signal}"><span class="dot"></span>${label}</div>
     </div>
     <div class="price-row">
@@ -324,27 +317,127 @@ function buildCard(pair, dates, closes){
       <div class="stat"><div class="stat-label">RSI 14</div><div class="stat-value">${rLast?.toFixed(1) ?? '—'}</div></div>
     </div>
     ${spark}
-    <div class="note">30 hari terakhir · Diperbarui ${dates[dates.length-1]}</div>
+    <div class="note">${lastLabel}</div>
   </div>`;
 }
+function nowStr(){
+  return new Date().toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short' });
+}
 
-async function loadAll(){
-  const grid = document.getElementById('grid');
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = true;
-  grid.innerHTML = `<div class="loading">Memuat data pasar…</div>`;
+/* ============ CRYPTO (Binance, no key) ============ */
+const CRYPTO_PAIRS = [
+  { symbol:"BTCUSDT", label:"BTC/USDT" },
+  { symbol:"ETHUSDT", label:"ETH/USDT" },
+  { symbol:"BNBUSDT", label:"BNB/USDT" },
+  { symbol:"SOLUSDT", label:"SOL/USDT" },
+  { symbol:"XRPUSDT", label:"XRP/USDT" },
+];
+function decimalsForPrice(p){
+  if(p>=100) return 2;
+  if(p>=1) return 4;
+  return 6;
+}
+async function fetchCrypto(pair){
+  const url = `https://api.binance.com/api/v3/klines?symbol=${pair.symbol}&interval=1h&limit=100`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Gagal ambil " + pair.label);
+  const raw = await res.json();
+  return raw.map(c => parseFloat(c[4])); // index 4 = close price
+}
+async function loadCrypto(){
+  const grid = document.getElementById('cryptoGrid');
   try{
-    const results = await Promise.all(PAIRS.map(p => fetchPair(p).then(r => ({pair:p, ...r}))));
-    grid.innerHTML = results.map(r => buildCard(r.pair, r.dates, r.closes)).join("");
-    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short', year:'numeric' });
+    const results = await Promise.all(CRYPTO_PAIRS.map(p => fetchCrypto(p).then(closes => ({p, closes}))));
+    grid.innerHTML = results.map(({p, closes}) => cardHTML({
+      name: p.label, sub: "Candle 1 jam · Binance", decimals: decimalsForPrice(closes[closes.length-1]),
+      closes, lastLabel: "Live · " + nowStr()
+    })).join("");
+    document.getElementById('cryptoLastUpdate').textContent = nowStr();
   }catch(err){
-    grid.innerHTML = `<div class="errbox">Gagal memuat data: ${err.message}<br><button onclick="loadAll()">Coba lagi</button></div>`;
-  }finally{
-    btn.disabled = false;
+    grid.innerHTML = `<div class="errbox">Gagal memuat crypto: ${err.message}</div>`;
   }
 }
 
-loadAll();
+/* ============ FOREX (Twelve Data w/ key, else Frankfurter daily) ============ */
+const FOREX_PAIRS = [
+  { label:"EUR/USD", td:"EUR/USD", base:"EUR", quote:"USD" },
+  { label:"GBP/USD", td:"GBP/USD", base:"GBP", quote:"USD" },
+  { label:"USD/JPY", td:"USD/JPY", base:"USD", quote:"JPY" },
+  { label:"USD/CHF", td:"USD/CHF", base:"USD", quote:"CHF" },
+  { label:"AUD/USD", td:"AUD/USD", base:"AUD", quote:"USD" },
+  { label:"USD/CAD", td:"USD/CAD", base:"USD", quote:"CAD" },
+  { label:"NZD/USD", td:"NZD/USD", base:"NZD", quote:"USD" },
+];
+function getApiKey(){ return localStorage.getItem('td_api_key') || ""; }
+function saveApiKey(){
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if(!val){ return; }
+  localStorage.setItem('td_api_key', val);
+  reflectKeyStatus();
+  loadForex();
+}
+function clearApiKey(){
+  localStorage.removeItem('td_api_key');
+  document.getElementById('apiKeyInput').value = "";
+  reflectKeyStatus();
+  loadForex();
+}
+function reflectKeyStatus(){
+  const key = getApiKey();
+  document.getElementById('keyStatus').textContent = key ? "✓ Key tersimpan" : "";
+  document.getElementById('clearKeyBtn').style.display = key ? "inline-block" : "none";
+  document.getElementById('apiKeyInput').value = key;
+  document.getElementById('forexTag').textContent = key ? "● live · Twelve Data" : "delayed · harian";
+  document.getElementById('forexTag').className = "tag " + (key ? "live" : "delayed");
+}
+function fmtDateISO(d){ return d.toISOString().slice(0,10); }
+
+async function fetchForexTwelveData(pair, key){
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(pair.td)}&interval=15min&outputsize=100&apikey=${key}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.status === "error" || !data.values) throw new Error(data.message || "Gagal ambil " + pair.label);
+  const closes = data.values.map(v => parseFloat(v.close)).reverse(); // API returns newest first
+  return closes;
+}
+async function fetchForexFrankfurter(pair){
+  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-130);
+  const url = `https://api.frankfurter.dev/v1/${fmtDateISO(start)}..${fmtDateISO(end)}?from=${pair.base}&to=${pair.quote}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Gagal ambil " + pair.label);
+  const data = await res.json();
+  const dates = Object.keys(data.rates).sort();
+  return dates.map(d => data.rates[d][pair.quote]);
+}
+async function loadForex(){
+  const grid = document.getElementById('forexGrid');
+  const key = getApiKey();
+  grid.innerHTML = `<div class="loading">Memuat data forex…</div>`;
+  try{
+    const results = await Promise.all(FOREX_PAIRS.map(async p => {
+      const closes = key ? await fetchForexTwelveData(p, key) : await fetchForexFrankfurter(p);
+      return { p, closes };
+    }));
+    const decimals = (p) => p.quote === "JPY" ? 3 : 5;
+    grid.innerHTML = results.map(({p, closes}) => cardHTML({
+      name: p.label,
+      sub: key ? "Candle 15 menit · Twelve Data" : "Kurs harian · ECB",
+      decimals: decimals(p),
+      closes,
+      lastLabel: key ? "Update ~15 menit · " + nowStr() : "Update 1x/hari · " + nowStr()
+    })).join("");
+    document.getElementById('forexLastUpdate').textContent = nowStr();
+  }catch(err){
+    grid.innerHTML = `<div class="errbox">Gagal memuat forex: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadForex()">Coba lagi</button></div>`;
+  }
+}
+
+/* ============ Init & auto-refresh ============ */
+reflectKeyStatus();
+loadCrypto();
+loadForex();
+setInterval(loadCrypto, 30 * 1000);           // crypto: tiap 30 detik
+setInterval(loadForex, 10 * 60 * 1000);        // forex: tiap 10 menit (jaga kuota API gratis)
 </script>
 </body>
 </html>
