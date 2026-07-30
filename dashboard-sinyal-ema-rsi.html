@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinyal Terminal — EMA/RSI Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0c10;
+    --panel: #12151c;
+    --panel-border: #1e2530;
+    --text: #e4e7eb;
+    --text-dim: #6b7280;
+    --bull: #16c784;
+    --bear: #ea3943;
+    --watch: #f0b90b;
+    --accent: #4c8bf5;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap: wrap; gap: 16px;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 18px; margin-bottom: 22px;
+  }
+  .title-block h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+    display:flex; align-items:center; gap:10px;
+  }
+  .live-dot{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--bull);
+    box-shadow: 0 0 0 0 rgba(22,199,132,0.6);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(22,199,132,0.55); }
+    70%{ box-shadow: 0 0 0 8px rgba(22,199,132,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(22,199,132,0); }
+  }
+  .title-block p{ color: var(--text-dim); font-size: 13px; margin-top: 6px; }
+  .meta{ text-align:right; font-family:'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
+  .meta span{ color: var(--text); }
+  button#refreshBtn{
+    margin-top: 8px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  button#refreshBtn:hover{ border-color: var(--accent); color: var(--accent); }
+  button#refreshBtn:disabled{ opacity: .5; cursor: default; }
+
+  /* ---- Disclaimer ---- */
+  .disclaimer{
+    background: rgba(240,185,11,0.06);
+    border: 1px solid rgba(240,185,11,0.25);
+    color: #d9b65a;
+    font-size: 12.5px;
+    line-height: 1.6;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+
+  /* ---- Grid ---- */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s ease;
+  }
+  .card:hover{ border-color: #2a3342; }
+  .card::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .card.bull::before{ background: var(--bull); }
+  .card.bear::before{ background: var(--bear); }
+  .card.watch::before{ background: var(--watch); }
+
+  .pair-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 14px; }
+  .pair-name{ font-family:'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
+  .pair-sub{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  .badge{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display:flex; align-items:center; gap: 6px;
+    letter-spacing: 0.04em;
+  }
+  .badge .dot{ width:6px; height:6px; border-radius:50%; }
+  .badge.bull{ background: rgba(22,199,132,0.12); color: var(--bull); }
+  .badge.bull .dot{ background: var(--bull); animation: pulse 1.6s infinite; }
+  .badge.bear{ background: rgba(234,57,67,0.12); color: var(--bear); }
+  .badge.bear .dot{ background: var(--bear); animation: pulse 1.6s infinite; }
+  .badge.watch{ background: rgba(240,185,11,0.1); color: var(--watch); }
+  .badge.watch .dot{ background: var(--watch); }
+
+  .price-row{ display:flex; align-items:baseline; gap:10px; margin-bottom: 14px; }
+  .price{ font-family:'JetBrains Mono', monospace; font-size: 26px; font-weight: 600; }
+  .chg{ font-family:'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+  .chg.up{ color: var(--bull); }
+  .chg.down{ color: var(--bear); }
+
+  .stats{
+    display:grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px; margin-bottom: 14px;
+  }
+  .stat{ background: rgba(255,255,255,0.02); border-radius: 6px; padding: 8px 10px; }
+  .stat-label{ font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value{ font-family:'JetBrains Mono', monospace; font-size: 13px; margin-top: 3px; }
+
+  .spark{ width: 100%; height: 48px; display:block; }
+
+  .note{ font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
+
+  .loading, .errbox{
+    grid-column: 1/-1;
+    text-align:center; padding: 50px 20px;
+    color: var(--text-dim);
+    font-family:'JetBrains Mono', monospace; font-size: 13px;
+  }
+  .errbox{ color: var(--bear); }
+  .errbox button{
+    margin-top: 14px; background: var(--panel); border:1px solid var(--panel-border);
+    color: var(--text); padding: 8px 16px; border-radius: 6px; cursor:pointer;
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  footer{
+    margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--panel-border);
+    color: var(--text-dim); font-size: 11.5px; line-height: 1.7;
+  }
+
+  @media (max-width: 560px){
+    header{ align-items:flex-start; }
+    .meta{ text-align:left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title-block">
+      <h1><span class="live-dot"></span>Sinyal Terminal</h1>
+      <p>Dashboard EMA 12/26 &amp; RSI 14 — bantu keputusan entry manual, bukan robot otomatis</p>
+    </div>
+    <div class="meta">
+      <div>Update terakhir: <span id="lastUpdate">—</span></div>
+      <div>Sumber data: <span>Frankfurter (ECB, harian)</span></div>
+      <button id="refreshBtn" onclick="loadAll()">↻ Refresh data</button>
+    </div>
+  </header>
+
+  <div class="disclaimer">
+    ⚠️ Data harga di sini adalah kurs referensi <strong>harian</strong> (bukan real-time tick dari Exness), diperbarui sekali sehari sekitar jam 22:00 WIB. Cocok untuk bias arah swing/harian, <strong>bukan untuk scalping</strong>. Sinyal EMA/RSI di bawah adalah alat bantu baca momentum, bukan rekomendasi atau jaminan profit — selalu konfirmasi ulang di chart Exness/TradingView sebelum entry, dan gunakan stop loss.
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="loading">Memuat data pasar…</div>
+  </div>
+
+  <footer>
+    Metodologi: EMA cepat (12) &amp; EMA lambat (26) dihitung dari ~90 hari kurs penutupan harian. Sinyal <strong>BUY</strong> muncul saat EMA12 baru saja memotong ke atas EMA26 dengan RSI(14) di atas 50. Sinyal <strong>SELL</strong> saat EMA12 memotong ke bawah EMA26 dengan RSI di bawah 50. Selain itu status menunjukkan <strong>WATCH</strong> (bias tren tanpa cross baru). Bukan nasihat keuangan.
+  </footer>
+
+</div>
+
+<script>
+const PAIRS = [
+  { label: "EUR/USD", base: "EUR", quote: "USD" },
+  { label: "GBP/USD", base: "GBP", quote: "USD" },
+  { label: "USD/JPY", base: "USD", quote: "JPY" },
+  { label: "USD/CHF", base: "USD", quote: "CHF" },
+  { label: "AUD/USD", base: "AUD", quote: "USD" },
+  { label: "USD/CAD", base: "USD", quote: "CAD" },
+  { label: "NZD/USD", base: "NZD", quote: "USD" },
+];
+
+function fmtDate(d){
+  const iso = d.toISOString().slice(0,10);
+  return iso;
+}
+
+function calcEMA(values, period){
+  const ema = new Array(values.length).fill(null);
+  if(values.length < period) return ema;
+  const k = 2/(period+1);
+  let sma = 0;
+  for(let i=0;i<period;i++) sma += values[i];
+  sma /= period;
+  ema[period-1] = sma;
+  for(let i=period;i<values.length;i++){
+    ema[i] = values[i]*k + ema[i-1]*(1-k);
+  }
+  return ema;
+}
+
+function calcRSI(values, period=14){
+  const rsi = new Array(values.length).fill(null);
+  if(values.length < period+1) return rsi;
+  let gains=0, losses=0;
+  for(let i=1;i<=period;i++){
+    const diff = values[i]-values[i-1];
+    if(diff>=0) gains+=diff; else losses-=diff;
+  }
+  let avgGain = gains/period, avgLoss = losses/period;
+  rsi[period] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+  for(let i=period+1;i<values.length;i++){
+    const diff = values[i]-values[i-1];
+    const gain = diff>0 ? diff : 0;
+    const loss = diff<0 ? -diff : 0;
+    avgGain = (avgGain*(period-1)+gain)/period;
+    avgLoss = (avgLoss*(period-1)+loss)/period;
+    rsi[i] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+  }
+  return rsi;
+}
+
+function sparkSVG(values){
+  const w = 280, h = 48, pad = 4;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = (max-min) || 1;
+  const step = (w-pad*2) / (values.length-1);
+  const pts = values.map((v,i)=>{
+    const x = pad + i*step;
+    const y = h - pad - ((v-min)/range)*(h-pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const last = values[values.length-1];
+  const up = last >= values[0];
+  const color = up ? "var(--bull)" : "var(--bear)";
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+async function fetchPair(pair){
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 130);
+  const url = `https://api.frankfurter.app/${fmtDate(start)}..${fmtDate(end)}?from=${pair.base}&to=${pair.quote}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Gagal ambil data " + pair.label);
+  const data = await res.json();
+  const dates = Object.keys(data.rates).sort();
+  const closes = dates.map(d => data.rates[d][pair.quote]);
+  return { dates, closes };
+}
+
+function buildCard(pair, dates, closes){
+  const emaFast = calcEMA(closes, 12);
+  const emaSlow = calcEMA(closes, 26);
+  const rsi = calcRSI(closes, 14);
+
+  const n = closes.length;
+  const lastClose = closes[n-1];
+  const prevClose = closes[n-2];
+  const chg = ((lastClose - prevClose)/prevClose)*100;
+
+  const fLast = emaFast[n-1], sLast = emaSlow[n-1];
+  const fPrev = emaFast[n-2], sPrev = emaSlow[n-2];
+  const rLast = rsi[n-1];
+
+  let signal = "watch", label = "WATCH";
+  if(fLast!=null && sLast!=null && fPrev!=null && sPrev!=null){
+    const crossedUp = (fPrev <= sPrev) && (fLast > sLast);
+    const crossedDown = (fPrev >= sPrev) && (fLast < sLast);
+    if(crossedUp && rLast > 50){ signal="bull"; label="BUY"; }
+    else if(crossedDown && rLast < 50){ signal="bear"; label="SELL"; }
+    else if(fLast > sLast){ signal="watch"; label="BIAS NAIK"; }
+    else { signal="watch"; label="BIAS TURUN"; }
+  }
+
+  const decimals = pair.quote === "JPY" ? 3 : 5;
+  const spark = sparkSVG(closes.slice(-30));
+
+  return `
+  <div class="card ${signal}">
+    <div class="pair-row">
+      <div>
+        <div class="pair-name">${pair.label}</div>
+        <div class="pair-sub">Kurs referensi harian · ECB</div>
+      </div>
+      <div class="badge ${signal}"><span class="dot"></span>${label}</div>
+    </div>
+    <div class="price-row">
+      <div class="price">${lastClose.toFixed(decimals)}</div>
+      <div class="chg ${chg>=0?'up':'down'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">EMA 12</div><div class="stat-value">${fLast?.toFixed(decimals) ?? '—'}</div></div>
+      <div class="stat"><div class="stat-label">EMA 26</div><div class="stat-value">${sLast?.toFixed(decimals) ?? '—'}</div></div>
+      <div class="stat"><div class="stat-label">RSI 14</div><div class="stat-value">${rLast?.toFixed(1) ?? '—'}</div></div>
+    </div>
+    ${spark}
+    <div class="note">30 hari terakhir · Diperbarui ${dates[dates.length-1]}</div>
+  </div>`;
+}
+
+async function loadAll(){
+  const grid = document.getElementById('grid');
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  grid.innerHTML = `<div class="loading">Memuat data pasar…</div>`;
+  try{
+    const results = await Promise.all(PAIRS.map(p => fetchPair(p).then(r => ({pair:p, ...r}))));
+    grid.innerHTML = results.map(r => buildCard(r.pair, r.dates, r.closes)).join("");
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short', year:'numeric' });
+  }catch(err){
+    grid.innerHTML = `<div class="errbox">Gagal memuat data: ${err.message}<br><button onclick="loadAll()">Coba lagi</button></div>`;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>
