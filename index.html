@@ -356,7 +356,7 @@
   </div>
 
   <footer>
-    Sumber: kalender ekonomi dari Finnhub (API resmi, jam ditampilkan WIB), dengan fallback otomatis ke ForexFactory kalau sumber utama gagal. Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key berbayar. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
+    Sumber: kalender ekonomi dari Finnhub (endpoint gratisnya sudah dibatasi jadi berbayar, jadi ini sering gagal) dengan fallback otomatis ke ForexFactory (jam ditampilkan WIB). Kalau keduanya gagal (biasanya karena rate-limit di proxy CORS publik yang dipakai bareng-bareng), halaman akan menampilkan cache terakhir yang berhasil dimuat di browser ini. Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key berbayar. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
   </footer>
 
 </div>
@@ -532,7 +532,12 @@ function finnhubImpactToImpact(imp){
 }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 
-/* Strategi 1: Finnhub API resmi (free tier, butuh API key gratis dari finnhub.io) */
+/* Strategi 1: Finnhub API resmi.
+   PERINGATAN: per pertengahan 2025, endpoint /calendar/economic Finnhub sudah DIPINDAH ke tier
+   berbayar. API key gratis akan selalu dapat balasan {"error":"You don't have access to this
+   resource."} di endpoint ini (bukan salah kode/token-nya, memang dibatasi dari sisi Finnhub).
+   Fungsi ini tetap dicoba duluan (siapa tahu kamu upgrade plan-nya), tapi jangan kaget kalau
+   selalu gagal di free tier — itu sebabnya ForexFactory jadi sumber utama secara de-facto. */
 async function fetchFromFinnhub(){
   if(!FINNHUB_TOKEN) throw new Error("Finnhub: FINNHUB_TOKEN belum diisi");
   const start = new Date(); start.setDate(start.getDate() - 3);
@@ -567,30 +572,67 @@ async function fetchFromFinnhub(){
   })).filter(ev => !isNaN(ev.dateObj.getTime()));
 }
 
-/* Strategi 2 (fallback): ForexFactory JSON mingguan lewat proxy */
+/* Strategi 2 (fallback): ForexFactory JSON mingguan lewat proxy.
+   Catatan: nfs.faireconomy.media membatasi hanya ~2 request/5menit PER IP untuk file export-nya.
+   Karena kita lewat proxy publik yang dipakai banyak orang lain juga, jatah itu sering sudah habis
+   duluan sebelum kita sempat pakai — makanya kita: (1) coba host cadangan cdn-nfs, (2) coba file
+   SATU PER SATU (bukan paralel) biar tidak membakar jatah rate-limit lebih cepat, (3) kenali
+   halaman HTML "Request Denied" itu secara eksplisit supaya pesan errornya jelas, bukan cuma
+   "JSON invalid". */
 async function fetchFromForexFactory(){
-  const urls = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json", "https://nfs.faireconomy.media/ff_calendar_nextweek.json"];
-  const results = await Promise.allSettled(urls.map(u => fetchWithProxies(u, "ForexFactory")));
+  const hosts = ["https://nfs.faireconomy.media", "https://cdn-nfs.faireconomy.media"];
+  const files = ["ff_calendar_thisweek.json", "ff_calendar_nextweek.json"];
+  const attempts = [];
   let merged = [];
   let anySuccess = false;
-  const attempts = [];
-  results.forEach((r, i) => {
-    const label = urls[i].includes("thisweek") ? "thisweek" : "nextweek";
-    if(r.status === "fulfilled"){
+
+  for(const file of files){
+    let gotFile = false;
+    for(const host of hosts){
+      const label = `${file.includes("thisweek") ? "thisweek" : "nextweek"}@${host.replace("https://","")}`;
       try{
-        const parsed = JSON.parse(r.value);
-        if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
-        else attempts.push(`${label}: bukan array JSON`);
-      }catch(e){ attempts.push(`${label}: JSON invalid (${e.message})`); }
-    }else{
-      attempts.push(`${label}: ${(r.reason && r.reason.message) || "gagal"}`);
+        const raw = await fetchWithProxies(`${host}/${file}`, "ForexFactory");
+        if(/^\s*<(!DOCTYPE|html)/i.test(raw) || /Request Denied/i.test(raw) || /exceeded the limit/i.test(raw)){
+          attempts.push(`${label}: kena rate-limit ForexFactory (proxy publik dipakai bareng banyak orang)`);
+          continue;
+        }
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)){ merged = merged.concat(parsed); anySuccess = true; gotFile = true; break; }
+        attempts.push(`${label}: bukan array JSON`);
+      }catch(e){
+        attempts.push(`${label}: ${e.message}`);
+      }
     }
-  });
+  }
   if(!anySuccess) throw new Error(attempts.join(" || "));
   return merged.map(ev => ({
     title: ev.title, country: ev.country, impact: ev.impact,
     previous: ev.previous, forecast: ev.forecast, dateObj: new Date(ev.date)
   })).filter(ev => !isNaN(ev.dateObj.getTime()));
+}
+
+/* ---- Cache lokal: kalau kedua sumber gagal (misal lagi kena rate-limit bareng-bareng),
+   tampilkan data terakhir yang berhasil dimuat daripada layar merah kosong. ---- */
+const CAL_CACHE_KEY = "mnt_calendar_cache_v1";
+function saveCalendarCache(events, sourceUsed){
+  try{
+    localStorage.setItem(CAL_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      source: sourceUsed,
+      events: events.map(ev => ({ ...ev, dateObj: ev.dateObj.toISOString() }))
+    }));
+  }catch(e){ /* localStorage penuh/nonaktif, abaikan diam-diam */ }
+}
+function loadCalendarCache(){
+  try{
+    const raw = localStorage.getItem(CAL_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    parsed.events = (parsed.events || [])
+      .map(ev => ({ ...ev, dateObj: new Date(ev.dateObj) }))
+      .filter(ev => !isNaN(ev.dateObj.getTime()));
+    return parsed;
+  }catch(e){ return null; }
 }
 
 function dateKey(d){
@@ -740,6 +782,29 @@ async function loadCalendar(){
   else{
     console.error("[Kalender] Finnhub gagal:", teRes.err && teRes.err.message);
     console.error("[Kalender] FF gagal:", ffRes.err && ffRes.err.message);
+
+    const cached = loadCalendarCache();
+    if(cached && cached.events && cached.events.length){
+      // Sumber live gagal semua, tapi kita punya cache dari load sebelumnya — pakai itu saja.
+      events = cached.events;
+      sourceUsed = cached.source + " (cache)";
+      calendarCache = events.slice().sort((a,b) => a.dateObj - b.dateObj);
+      const ageMin = Math.round((Date.now() - cached.savedAt) / 60000);
+      const ageLabel = ageMin < 1 ? "baru saja" : ageMin < 60 ? `${ageMin} menit lalu` : `${Math.round(ageMin/60)} jam lalu`;
+      const today2 = new Date();
+      if(calViewYear === undefined){ calViewYear = today2.getFullYear(); calViewMonth = today2.getMonth(); }
+      if(calSelectedDateKey === null) calSelectedDateKey = dateKey(today2);
+      document.getElementById('calSourceTag').textContent = "● cache · " + sourceUsed;
+      renderMonthGrid();
+      renderDayPanel();
+      grid.insertAdjacentHTML("beforeend", `<div class="cal-scope-note" style="color:#d9b65a">
+        ⚠️ Live gagal (Finnhub: ${escapeHTML((teRes.err && teRes.err.message) || "?")} | FF: ${escapeHTML((ffRes.err && ffRes.err.message) || "?")}).
+        Menampilkan data cache dari ${ageLabel} — mungkin sudah tidak akurat, jangan dipakai untuk entry.
+        <button class="ghost" style="margin-left:8px" onclick="loadCalendar()">Coba live lagi</button>
+      </div>`);
+      return;
+    }
+
     grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Finnhub &amp; ForexFactory).<br>
       <span style="opacity:.75;font-size:11px;display:inline-block;max-width:900px;white-space:normal;line-height:1.6;margin-top:8px">
         <b>Finnhub:</b> ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>
@@ -748,6 +813,8 @@ async function loadCalendar(){
       <button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
     return;
   }
+
+  saveCalendarCache(events, sourceUsed);
 
   const seen = new Set();
   calendarCache = events.filter(ev => {
