@@ -262,24 +262,97 @@ function newsCardHTML({title, url, source, time, image, excerpt, tags}){
   </div>`;
 }
 
-/* ============ CRYPTO NEWS (CryptoCompare, no key) ============ */
+/* ============ RSS engine with multi-proxy fallback (no API key anywhere) ============ */
+const CORS_PROXIES = [
+  url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
+  url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+];
+
+async function fetchWithProxies(targetUrl){
+  let lastErr;
+  for(const buildProxyUrl of CORS_PROXIES){
+    try{
+      const res = await fetch(buildProxyUrl(targetUrl));
+      if(!res.ok) throw new Error("status " + res.status);
+      const text = await res.text();
+      if(!text || text.length < 30) throw new Error("respons kosong");
+      return text;
+    }catch(err){
+      lastErr = err;
+      continue; // coba proxy berikutnya
+    }
+  }
+  throw lastErr || new Error("Semua proxy gagal");
+}
+
+function parseRSSItems(xmlText, defaultSourceName){
+  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+  if(doc.querySelector("parsererror")) throw new Error("Format RSS tidak valid");
+  const items = Array.from(doc.querySelectorAll("item"));
+  return items.map(node => {
+    const title = node.querySelector("title") ? node.querySelector("title").textContent : "";
+    const link = node.querySelector("link") ? node.querySelector("link").textContent : "";
+    const pubDate = node.querySelector("pubDate") ? node.querySelector("pubDate").textContent : "";
+    let desc = node.querySelector("description") ? node.querySelector("description").textContent : "";
+    desc = stripHTML(desc);
+    let img = "";
+    const media = node.getElementsByTagName("media:content")[0]
+      || node.getElementsByTagName("media:thumbnail")[0]
+      || node.getElementsByTagName("enclosure")[0];
+    if(media) img = media.getAttribute("url") || "";
+    if(!img){
+      const m = (node.querySelector("description") ? node.querySelector("description").textContent : "").match(/<img[^>]+src="([^"]+)"/);
+      if(m) img = m[1];
+    }
+    const catNodes = Array.from(node.querySelectorAll("category"));
+    const tags = catNodes.map(c => c.textContent).filter(Boolean);
+    const pubDateObj = pubDate ? new Date(pubDate) : null;
+    return {
+      title, url: link,
+      source: defaultSourceName,
+      timestamp: pubDateObj ? pubDateObj.getTime() : 0,
+      time: pubDateObj ? timeAgo(pubDateObj) : "",
+      excerpt: desc,
+      image: img,
+      tags
+    };
+  });
+}
+
+async function fetchFeed(feedUrl, sourceName){
+  const xml = await fetchWithProxies(feedUrl);
+  return parseRSSItems(xml, sourceName);
+}
+
+/* fetch several feeds in parallel, merge, sort by newest, ignore feeds that fail */
+async function fetchMergedFeeds(feedList){
+  const results = await Promise.allSettled(feedList.map(f => fetchFeed(f.url, f.name)));
+  let merged = [];
+  let anySuccess = false;
+  results.forEach(r => {
+    if(r.status === "fulfilled"){ anySuccess = true; merged = merged.concat(r.value); }
+  });
+  if(!anySuccess) throw new Error("Semua sumber berita gagal dimuat");
+  merged.sort((a,b) => b.timestamp - a.timestamp);
+  return merged;
+}
+
+/* ============ CRYPTO NEWS (RSS: Cointelegraph + CoinDesk) ============ */
+const CRYPTO_FEEDS = [
+  { url: "https://cointelegraph.com/rss", name: "Cointelegraph" },
+  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: "CoinDesk" },
+];
 let cryptoNewsCache = [];
 let activeCryptoCat = "ALL";
-
-async function fetchCryptoNews(){
-  const url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest";
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Gagal ambil berita crypto (status " + res.status + ")");
-  const data = await res.json();
-  if(!data.Data) throw new Error("Format data tidak dikenali");
-  return data.Data;
-}
 
 function renderCryptoGrid(){
   const grid = document.getElementById('cryptoGrid');
   const filtered = activeCryptoCat === "ALL"
     ? cryptoNewsCache
-    : cryptoNewsCache.filter(item => (item.categories||"").toUpperCase().includes(activeCryptoCat.toUpperCase()));
+    : cryptoNewsCache.filter(item =>
+        item.title.toUpperCase().includes(activeCryptoCat.toUpperCase()) ||
+        (item.tags||[]).some(t => t.toUpperCase().includes(activeCryptoCat.toUpperCase())));
   if(filtered.length === 0){
     grid.innerHTML = `<div class="infobox">Tidak ada berita untuk kategori ini saat ini.</div>`;
     return;
@@ -287,11 +360,11 @@ function renderCryptoGrid(){
   grid.innerHTML = filtered.slice(0,18).map(item => newsCardHTML({
     title: item.title,
     url: item.url,
-    source: (item.source_info && item.source_info.name) || item.source || "Crypto",
-    time: timeAgo(item.published_on),
-    image: item.imageurl,
-    excerpt: item.body ? item.body.slice(0,140) + (item.body.length>140 ? "…" : "") : "",
-    tags: (item.categories||"").split("|").filter(Boolean)
+    source: item.source,
+    time: item.time,
+    image: item.image,
+    excerpt: item.excerpt.slice(0,140) + (item.excerpt.length>140 ? "…" : ""),
+    tags: item.tags
   })).join("");
 }
 
@@ -299,7 +372,7 @@ async function loadCryptoNews(){
   const grid = document.getElementById('cryptoGrid');
   grid.innerHTML = `<div class="loading">Memuat berita crypto…</div>`;
   try{
-    cryptoNewsCache = await fetchCryptoNews();
+    cryptoNewsCache = await fetchMergedFeeds(CRYPTO_FEEDS);
     renderCryptoGrid();
     document.getElementById('cryptoLastUpdate').textContent = nowStr();
   }catch(err){
@@ -316,46 +389,21 @@ document.getElementById('cryptoChips').addEventListener('click', (e) => {
   renderCryptoGrid();
 });
 
-/* ============ FOREX NEWS (ForexLive RSS via CORS proxy, no key) ============ */
-async function fetchForexNews(){
-  const rssUrl = "https://www.forexlive.com/feed/news";
-  const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(rssUrl);
-  const res = await fetch(proxyUrl);
-  if(!res.ok) throw new Error("Gagal ambil berita forex (status " + res.status + ")");
-  const xmlText = await res.text();
-  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-  const items = Array.from(doc.querySelectorAll("item"));
-  if(items.length === 0) throw new Error("Feed forex kosong / format berubah");
-  return items.map(node => {
-    const title = node.querySelector("title") ? node.querySelector("title").textContent : "";
-    const link = node.querySelector("link") ? node.querySelector("link").textContent : "";
-    const pubDate = node.querySelector("pubDate") ? node.querySelector("pubDate").textContent : "";
-    let desc = node.querySelector("description") ? node.querySelector("description").textContent : "";
-    desc = stripHTML(desc);
-    let img = "";
-    const media = node.getElementsByTagName("media:content")[0] || node.getElementsByTagName("enclosure")[0];
-    if(media) img = media.getAttribute("url") || "";
-    const catNodes = Array.from(node.querySelectorAll("category"));
-    const tags = catNodes.map(c => c.textContent).filter(Boolean);
-    return {
-      title, url: link,
-      time: pubDate ? timeAgo(new Date(pubDate)) : "",
-      excerpt: desc,
-      image: img,
-      tags
-    };
-  });
-}
+/* ============ FOREX NEWS (RSS: ForexLive + FXStreet) ============ */
+const FOREX_FEEDS = [
+  { url: "https://www.forexlive.com/feed/news", name: "ForexLive" },
+  { url: "https://www.fxstreet.com/rss/news", name: "FXStreet" },
+];
 
 async function loadForexNews(){
   const grid = document.getElementById('forexGrid');
   grid.innerHTML = `<div class="loading">Memuat berita forex…</div>`;
   try{
-    const items = await fetchForexNews();
+    const items = await fetchMergedFeeds(FOREX_FEEDS);
     grid.innerHTML = items.slice(0,18).map(item => newsCardHTML({
       title: item.title,
       url: item.url,
-      source: "ForexLive",
+      source: item.source,
       time: item.time,
       image: item.image,
       excerpt: item.excerpt.slice(0,140) + (item.excerpt.length>140 ? "…" : ""),
@@ -370,7 +418,7 @@ async function loadForexNews(){
 /* ============ Init & auto-refresh ============ */
 loadCryptoNews();
 loadForexNews();
-setInterval(loadCryptoNews, 2 * 60 * 1000);   // crypto news: tiap 2 menit
+setInterval(loadCryptoNews, 3 * 60 * 1000);   // crypto news: tiap 3 menit
 setInterval(loadForexNews, 5 * 60 * 1000);    // forex news: tiap 5 menit
 </script>
 </body>
