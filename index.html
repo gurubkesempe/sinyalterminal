@@ -409,11 +409,14 @@ function newsCardHTML({title, url, source, time, image, excerpt, tags}){
 
 /* ============ RSS engine with multi-proxy fallback (no API key anywhere) ============ */
 const CORS_PROXIES = [
-  url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
   url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
-  url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+  url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  url => "https://corsfix.com/" + url, // gratis untuk domain publik, tanpa API key
+  url => "https://cors.x2u.in/" + url,
   url => "https://api.allorigins.win/get?url=" + encodeURIComponent(url), // varian allorigins (bungkus JSON, contents diambil di bawah)
   url => "https://thingproxy.freeboard.io/fetch/" + url,
+  // corsproxy.io sengaja TIDAK dipakai lagi: sejak 2026 free tier-nya cuma berlaku untuk localhost,
+  // jadi selalu gagal ("Failed to fetch") kalau dipanggil dari domain publik seperti GitHub Pages.
 ];
 
 async function fetchWithProxies(targetUrl, debugLabel){
