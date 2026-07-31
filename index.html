@@ -411,7 +411,7 @@ function newsCardHTML({title, url, source, time, image, excerpt, tags}){
 const CORS_PROXIES = [
   url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
-  url => "https://corsfix.com/" + url, // gratis untuk domain publik, tanpa API key
+  url => "https://proxy.corsfix.com/?" + url, // format resmi corsfix; TANPA domain whitelist/API key ini bisa kena limit dari sisi mereka
   url => "https://cors.x2u.in/" + url,
   url => "https://api.allorigins.win/get?url=" + encodeURIComponent(url), // varian allorigins (bungkus JSON, contents diambil di bawah)
   url => "https://thingproxy.freeboard.io/fetch/" + url,
