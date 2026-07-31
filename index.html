@@ -304,7 +304,7 @@
   <!-- ===== ECONOMIC CALENDAR SECTION ===== -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Kalender Ekonomi <span class="tag live" id="calSourceTag">● live · Trading Economics</span></div>
+      <div class="section-title">Kalender Ekonomi <span class="tag live" id="calSourceTag">● live · Finnhub</span></div>
       <div class="section-meta">Zona waktu: <span>WIB (GMT+7)</span> · Terakhir: <span id="calLastUpdate">—</span> <button class="ghost" style="margin-left:10px" onclick="loadCalendar()">Refresh</button></div>
     </div>
     <div class="chips" id="calChips">
@@ -325,7 +325,7 @@
       </div>
       <div class="cal-monthgrid" id="calMonthGrid"><div class="loading">Memuat kalender ekonomi…</div></div>
       <div class="cal-daypanel" id="calDayPanel"></div>
-      <div class="cal-scope-note">📌 Data event mencakup sekitar 45 hari ke depan (sumber utama: Trading Economics, fallback ForexFactory). Bulan yang lebih jauh tetap bisa dijelajah, tapi datanya baru muncul saat tanggalnya masuk ke rentang tersebut.</div>
+      <div class="cal-scope-note">📌 Data event mencakup sekitar 45 hari ke depan (sumber utama: Finnhub, fallback ForexFactory). Bulan yang lebih jauh tetap bisa dijelajah, tapi datanya baru muncul saat tanggalnya masuk ke rentang tersebut.</div>
     </div>
   </div>
 
@@ -356,7 +356,7 @@
   </div>
 
   <footer>
-    Sumber: kalender ekonomi dari Trading Economics (API publik, jam ditampilkan WIB), dengan fallback otomatis ke ForexFactory kalau sumber utama gagal. Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key berbayar. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
+    Sumber: kalender ekonomi dari Finnhub (API resmi, jam ditampilkan WIB), dengan fallback otomatis ke ForexFactory kalau sumber utama gagal. Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key berbayar. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
   </footer>
 
 </div>
@@ -412,6 +412,9 @@ function newsCardHTML({title, url, source, time, image, excerpt, tags}){
 // >>> ISI INI kalau kamu sudah deploy Cloudflare Worker sendiri (lihat instruksi yang dikirim ke kamu) <<<
 // Contoh: "https://cors-proxy.namamu.workers.dev"  (JANGAN pakai trailing slash di akhir)
 const MY_WORKER_PROXY = "https://cors-proxy.ramadhanii9702.workers.dev"; // Cloudflare Worker milik sendiri, dicoba paling pertama
+
+// API key gratis dari finnhub.io/dashboard (daftar gratis, tanpa kartu kredit)
+const FINNHUB_TOKEN = "d9m6u1hr01qpfnk7amo0d9m6u1hr01qpfnk7amog";
 
 const CORS_PROXIES = [
   ...(MY_WORKER_PROXY ? [ url => MY_WORKER_PROXY + "/?url=" + encodeURIComponent(url) ] : []),
@@ -505,7 +508,7 @@ async function fetchMergedFeeds(feedList){
   return merged;
 }
 
-/* ============ ECONOMIC CALENDAR (Trading Economics guest API + ForexFactory fallback) ============ */
+/* ============ ECONOMIC CALENDAR (Finnhub API resmi + ForexFactory fallback) ============ */
 let calendarCache = [];        // semua event yang berhasil diambil
 let activeImpact = "ALL";
 let calViewYear, calViewMonth; // bulan yang sedang ditampilkan di grid (0-based month)
@@ -520,43 +523,47 @@ const COUNTRY_TO_CCY = {
   "Mexico":"MXN", "Russia":"RUB", "South Africa":"ZAR", "Turkey":"TRY", "Hong Kong":"HKD"
 };
 function ccyFor(country){ return COUNTRY_TO_CCY[country] || (country||"").slice(0,3).toUpperCase(); }
-function teImportanceToImpact(imp){
-  if(imp === 3 || imp === "3") return "High";
-  if(imp === 2 || imp === "2") return "Medium";
+function finnhubImpactToImpact(imp){
+  if(typeof imp === "number"){ if(imp >= 3) return "High"; if(imp === 2) return "Medium"; return "Low"; }
+  const s = (imp || "").toString().toLowerCase();
+  if(s === "high" || s === "3") return "High";
+  if(s === "medium" || s === "med" || s === "2") return "Medium";
   return "Low";
 }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 
-/* Strategi 1: Trading Economics guest API (fetch langsung, biasanya CORS-friendly) */
-async function fetchFromTradingEconomics(){
+/* Strategi 1: Finnhub API resmi (free tier, butuh API key gratis dari finnhub.io) */
+async function fetchFromFinnhub(){
+  if(!FINNHUB_TOKEN) throw new Error("Finnhub: FINNHUB_TOKEN belum diisi");
   const start = new Date(); start.setDate(start.getDate() - 3);
   const end = new Date(); end.setDate(end.getDate() + 45);
-  const url = `https://api.tradingeconomics.com/calendar/country/All/${isoDate(start)}/${isoDate(end)}?c=guest:guest`;
+  const target = `https://finnhub.io/api/v1/calendar/economic?from=${isoDate(start)}&to=${isoDate(end)}&token=${FINNHUB_TOKEN}`;
   let raw;
   try{
-    const res = await fetch(url);
+    const res = await fetch(target);
     if(!res.ok) throw new Error("status " + res.status);
     raw = await res.text();
   }catch(directErr){
     const directMsg = (directErr && directErr.message) || "error tidak dikenal";
-    console.warn("[TradingEconomics] fetch langsung gagal (biasa karena CORS), coba lewat proxy:", directMsg);
+    console.warn("[Finnhub] fetch langsung gagal (biasa karena CORS), coba lewat proxy:", directMsg);
     try{
-      raw = await fetchWithProxies(url, "TradingEconomics");
+      raw = await fetchWithProxies(target, "Finnhub");
     }catch(proxyErr){
       throw new Error(`fetch langsung: ${directMsg} | ${proxyErr.message}`);
     }
   }
   let data;
   try{ data = JSON.parse(raw); }
-  catch(e){ throw new Error("TE: respons bukan JSON valid (kemungkinan diblokir/rate-limited) — " + raw.slice(0,80)); }
-  if(!Array.isArray(data)) throw new Error("TE: format tidak dikenali — " + JSON.stringify(data).slice(0,120));
-  return data.map(ev => ({
-    title: ev.Event || ev.Category || "Event",
-    country: ccyFor(ev.Country),
-    impact: teImportanceToImpact(ev.Importance),
-    previous: ev.Previous != null ? String(ev.Previous) : "",
-    forecast: ev.Forecast != null ? String(ev.Forecast) : "",
-    dateObj: new Date(ev.Date)
+  catch(e){ throw new Error("Finnhub: respons bukan JSON valid — " + raw.slice(0,100)); }
+  const list = data.economicCalendar;
+  if(!Array.isArray(list)) throw new Error("Finnhub: format tidak dikenali — " + JSON.stringify(data).slice(0,150));
+  return list.map(ev => ({
+    title: ev.event || "Event",
+    country: (ev.country || "").toUpperCase(),
+    impact: finnhubImpactToImpact(ev.impact),
+    previous: ev.prev != null ? String(ev.prev) : "",
+    forecast: ev.estimate != null ? String(ev.estimate) : "",
+    dateObj: new Date((ev.time || "").replace(" ", "T") + "Z")
   })).filter(ev => !isNaN(ev.dateObj.getTime()));
 }
 
@@ -721,21 +728,21 @@ async function loadCalendar(){
 
   // Jalankan kedua sumber secara PARALEL: siapa yang berhasil duluan, dipakai duluan.
   // Ini jauh lebih cepat & lebih tahan gagal dibanding coba TE dulu baru FF setelah TE benar-benar habis semua proxy-nya.
-  const teP = fetchFromTradingEconomics().then(evs => ({ ok: true, evs, src: "Trading Economics" }))
-    .catch(err => ({ ok: false, err, src: "Trading Economics" }));
+  const teP = fetchFromFinnhub().then(evs => ({ ok: true, evs, src: "Finnhub" }))
+    .catch(err => ({ ok: false, err, src: "Finnhub" }));
   const ffP = fetchFromForexFactory().then(evs => ({ ok: true, evs, src: "ForexFactory" }))
     .catch(err => ({ ok: false, err, src: "ForexFactory" }));
 
   const [teRes, ffRes] = await Promise.all([teP, ffP]);
 
-  if(teRes.ok){ events = teRes.evs; sourceUsed = "Trading Economics"; }
+  if(teRes.ok){ events = teRes.evs; sourceUsed = "Finnhub"; }
   else if(ffRes.ok){ events = ffRes.evs; sourceUsed = "ForexFactory"; }
   else{
-    console.error("[Kalender] TE gagal:", teRes.err && teRes.err.message);
+    console.error("[Kalender] Finnhub gagal:", teRes.err && teRes.err.message);
     console.error("[Kalender] FF gagal:", ffRes.err && ffRes.err.message);
-    grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Trading Economics &amp; ForexFactory).<br>
+    grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Finnhub &amp; ForexFactory).<br>
       <span style="opacity:.75;font-size:11px;display:inline-block;max-width:900px;white-space:normal;line-height:1.6;margin-top:8px">
-        <b>TE:</b> ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>
+        <b>Finnhub:</b> ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>
         <b>FF:</b> ${escapeHTML((ffRes.err && ffRes.err.message) || "?")}
       </span><br>
       <button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
