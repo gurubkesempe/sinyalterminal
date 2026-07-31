@@ -304,7 +304,7 @@
   <!-- ===== ECONOMIC CALENDAR SECTION ===== -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Kalender Ekonomi <span class="tag live">● live · ForexFactory</span></div>
+      <div class="section-title">Kalender Ekonomi <span class="tag live" id="calSourceTag">● live · Trading Economics</span></div>
       <div class="section-meta">Zona waktu: <span>WIB (GMT+7)</span> · Terakhir: <span id="calLastUpdate">—</span> <button class="ghost" style="margin-left:10px" onclick="loadCalendar()">Refresh</button></div>
     </div>
     <div class="chips" id="calChips">
@@ -325,7 +325,7 @@
       </div>
       <div class="cal-monthgrid" id="calMonthGrid"><div class="loading">Memuat kalender ekonomi…</div></div>
       <div class="cal-daypanel" id="calDayPanel"></div>
-      <div class="cal-scope-note">📌 Data event hanya tersedia untuk ±2 minggu ke depan (mengikuti sumber data gratis ForexFactory). Bulan lain bisa tetap dijelajah, tapi tanggalnya belum ada data event.</div>
+      <div class="cal-scope-note">📌 Data event mencakup sekitar 45 hari ke depan (sumber utama: Trading Economics, fallback ForexFactory). Bulan yang lebih jauh tetap bisa dijelajah, tapi datanya baru muncul saat tanggalnya masuk ke rentang tersebut.</div>
     </div>
   </div>
 
@@ -356,7 +356,7 @@
   </div>
 
   <footer>
-    Sumber: kalender ekonomi dari data mingguan ForexFactory (jam ditampilkan dalam WIB). Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
+    Sumber: kalender ekonomi dari Trading Economics (API publik, jam ditampilkan WIB), dengan fallback otomatis ke ForexFactory kalau sumber utama gagal. Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key berbayar. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
   </footer>
 
 </div>
@@ -487,15 +487,73 @@ async function fetchMergedFeeds(feedList){
   return merged;
 }
 
-/* ============ ECONOMIC CALENDAR (ForexFactory JSON, month-grid, no key) ============ */
-const CALENDAR_URLS = [
-  "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
-  "https://nfs.faireconomy.media/ff_calendar_nextweek.json",
-];
-let calendarCache = [];        // semua event yang berhasil diambil (this week + next week)
+/* ============ ECONOMIC CALENDAR (Trading Economics guest API + ForexFactory fallback) ============ */
+let calendarCache = [];        // semua event yang berhasil diambil
 let activeImpact = "ALL";
 let calViewYear, calViewMonth; // bulan yang sedang ditampilkan di grid (0-based month)
 let calSelectedDateKey = null; // "YYYY-MM-DD" hari yang dipilih user
+
+const COUNTRY_TO_CCY = {
+  "United States":"USD", "Euro Area":"EUR", "European Union":"EUR", "Germany":"EUR",
+  "France":"EUR", "Italy":"EUR", "Spain":"EUR", "Netherlands":"EUR",
+  "United Kingdom":"GBP", "Japan":"JPY", "Australia":"AUD", "Canada":"CAD",
+  "Switzerland":"CHF", "New Zealand":"NZD", "China":"CNY", "India":"INR",
+  "Indonesia":"IDR", "Singapore":"SGD", "South Korea":"KRW", "Brazil":"BRL",
+  "Mexico":"MXN", "Russia":"RUB", "South Africa":"ZAR", "Turkey":"TRY", "Hong Kong":"HKD"
+};
+function ccyFor(country){ return COUNTRY_TO_CCY[country] || (country||"").slice(0,3).toUpperCase(); }
+function teImportanceToImpact(imp){
+  if(imp === 3 || imp === "3") return "High";
+  if(imp === 2 || imp === "2") return "Medium";
+  return "Low";
+}
+function isoDate(d){ return d.toISOString().slice(0,10); }
+
+/* Strategi 1: Trading Economics guest API (fetch langsung, biasanya CORS-friendly) */
+async function fetchFromTradingEconomics(){
+  const start = new Date(); start.setDate(start.getDate() - 3);
+  const end = new Date(); end.setDate(end.getDate() + 45);
+  const url = `https://api.tradingeconomics.com/calendar/country/All/${isoDate(start)}/${isoDate(end)}?c=guest:guest`;
+  let raw;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("status " + res.status);
+    raw = await res.text();
+  }catch(directErr){
+    raw = await fetchWithProxies(url); // fallback lewat proxy kalau CORS langsung diblokir
+  }
+  const data = JSON.parse(raw);
+  if(!Array.isArray(data)) throw new Error("Format TE tidak dikenali");
+  return data.map(ev => ({
+    title: ev.Event || ev.Category || "Event",
+    country: ccyFor(ev.Country),
+    impact: teImportanceToImpact(ev.Importance),
+    previous: ev.Previous != null ? String(ev.Previous) : "",
+    forecast: ev.Forecast != null ? String(ev.Forecast) : "",
+    dateObj: new Date(ev.Date)
+  })).filter(ev => !isNaN(ev.dateObj.getTime()));
+}
+
+/* Strategi 2 (fallback): ForexFactory JSON mingguan lewat proxy */
+async function fetchFromForexFactory(){
+  const urls = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json", "https://nfs.faireconomy.media/ff_calendar_nextweek.json"];
+  const results = await Promise.allSettled(urls.map(u => fetchWithProxies(u)));
+  let merged = [];
+  let anySuccess = false;
+  results.forEach(r => {
+    if(r.status === "fulfilled"){
+      try{
+        const parsed = JSON.parse(r.value);
+        if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
+      }catch(e){ /* respons bukan JSON valid (kemungkinan rate-limited), lewati */ }
+    }
+  });
+  if(!anySuccess) throw new Error("ForexFactory juga gagal");
+  return merged.map(ev => ({
+    title: ev.title, country: ev.country, impact: ev.impact,
+    previous: ev.previous, forecast: ev.forecast, dateObj: new Date(ev.date)
+  })).filter(ev => !isNaN(ev.dateObj.getTime()));
+}
 
 function dateKey(d){
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
@@ -627,40 +685,35 @@ document.getElementById('calTodayBtn').addEventListener('click', () => {
 async function loadCalendar(){
   const grid = document.getElementById('calMonthGrid');
   grid.innerHTML = `<div class="loading">Memuat kalender ekonomi…</div>`;
+  let events = null;
+  let sourceUsed = "";
   try{
-    const results = await Promise.allSettled(CALENDAR_URLS.map(u => fetchWithProxies(u)));
-    let merged = [];
-    let anySuccess = false;
-    results.forEach(r => {
-      if(r.status === "fulfilled"){
-        try{
-          const parsed = JSON.parse(r.value);
-          if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
-        }catch(e){ /* lewati kalau JSON rusak */ }
-      }
-    });
-    if(!anySuccess) throw new Error("Semua sumber kalender gagal dimuat");
-    // dedup berdasarkan title+date, lalu simpan
-    const seen = new Set();
-    calendarCache = merged
-      .map(ev => ({ ...ev, dateObj: new Date(ev.date) }))
-      .filter(ev => !isNaN(ev.dateObj.getTime()))
-      .filter(ev => {
-        const key = ev.title + "|" + ev.date + "|" + ev.country;
-        if(seen.has(key)) return false;
-        seen.add(key); return true;
-      })
-      .sort((a,b) => a.dateObj - b.dateObj);
-
-    const today = new Date();
-    if(calViewYear === undefined){ calViewYear = today.getFullYear(); calViewMonth = today.getMonth(); }
-    if(calSelectedDateKey === null) calSelectedDateKey = dateKey(today);
-    renderMonthGrid();
-    renderDayPanel();
-    document.getElementById('calLastUpdate').textContent = nowStr();
-  }catch(err){
-    grid.innerHTML = `<div class="errbox">Gagal memuat kalender: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
+    events = await fetchFromTradingEconomics();
+    sourceUsed = "Trading Economics";
+  }catch(teErr){
+    try{
+      events = await fetchFromForexFactory();
+      sourceUsed = "ForexFactory";
+    }catch(ffErr){
+      grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Trading Economics &amp; ForexFactory).<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
+      return;
+    }
   }
+
+  const seen = new Set();
+  calendarCache = events.filter(ev => {
+    const key = ev.title + "|" + ev.dateObj.getTime() + "|" + ev.country;
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  }).sort((a,b) => a.dateObj - b.dateObj);
+
+  const today = new Date();
+  if(calViewYear === undefined){ calViewYear = today.getFullYear(); calViewMonth = today.getMonth(); }
+  if(calSelectedDateKey === null) calSelectedDateKey = dateKey(today);
+  renderMonthGrid();
+  renderDayPanel();
+  document.getElementById('calSourceTag').textContent = "● live · " + sourceUsed;
+  document.getElementById('calLastUpdate').textContent = nowStr();
 }
 
 document.getElementById('calChips').addEventListener('click', (e) => {
