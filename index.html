@@ -408,15 +408,18 @@ function newsCardHTML({title, url, source, time, image, excerpt, tags}){
 }
 
 /* ============ RSS engine with multi-proxy fallback (no API key anywhere) ============ */
+
+// >>> ISI INI kalau kamu sudah deploy Cloudflare Worker sendiri (lihat instruksi yang dikirim ke kamu) <<<
+// Contoh: "https://cors-proxy.namamu.workers.dev"  (JANGAN pakai trailing slash di akhir)
+const MY_WORKER_PROXY = "https://cors-proxy.ramadhanii9702.workers.dev"; // Cloudflare Worker milik sendiri, dicoba paling pertama
+
 const CORS_PROXIES = [
+  ...(MY_WORKER_PROXY ? [ url => MY_WORKER_PROXY + "/?url=" + encodeURIComponent(url) ] : []),
   url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
-  url => "https://proxy.corsfix.com/?" + url, // format resmi corsfix; TANPA domain whitelist/API key ini bisa kena limit dari sisi mereka
-  url => "https://cors.x2u.in/" + url,
   url => "https://api.allorigins.win/get?url=" + encodeURIComponent(url), // varian allorigins (bungkus JSON, contents diambil di bawah)
-  url => "https://thingproxy.freeboard.io/fetch/" + url,
-  // corsproxy.io sengaja TIDAK dipakai lagi: sejak 2026 free tier-nya cuma berlaku untuk localhost,
-  // jadi selalu gagal ("Failed to fetch") kalau dipanggil dari domain publik seperti GitHub Pages.
+  // thingproxy.freeboard.io DIHAPUS: domainnya sudah mati (DNS tidak resolve lagi).
+  // corsfix & cors.x2u.in DIHAPUS: keduanya butuh whitelist domain/API key untuk origin publik, jadi selalu 403/CORS-blocked buat kita.
 ];
 
 async function fetchWithProxies(targetUrl, debugLabel){
