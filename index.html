@@ -420,30 +420,34 @@ const CORS_PROXIES = [
 ];
 
 async function fetchWithProxies(targetUrl, debugLabel){
-  let lastErr;
+  const attempts = [];
   for(const buildProxyUrl of CORS_PROXIES){
     const proxyUrl = buildProxyUrl(targetUrl);
+    const proxyName = proxyUrl.split("/")[2]; // hostname doang, biar ringkas
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000); // 9 detik per proxy, proxy gratisan kadang lambat
     try{
       const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
-      if(!res.ok) throw new Error("status " + res.status);
+      if(!res.ok){ attempts.push(`${proxyName}: HTTP ${res.status}`); continue; }
       let text = await res.text();
       // varian allorigins "get" membungkus hasil dalam JSON { contents: "..." }
       if(proxyUrl.includes("allorigins.win/get?url=")){
         try{ const wrapped = JSON.parse(text); text = wrapped.contents || ""; }catch(e){ /* biarkan apa adanya */ }
       }
-      if(!text || text.length < 30) throw new Error("respons kosong");
+      if(!text || text.length < 30){ attempts.push(`${proxyName}: respons kosong`); continue; }
       return text;
     }catch(err){
       clearTimeout(timeoutId);
-      lastErr = (err && err.name === "AbortError") ? new Error("timeout") : err;
-      console.warn(`[${debugLabel||"fetchWithProxies"}] proxy gagal (${proxyUrl}):`, lastErr.message);
+      const msg = (err && err.name === "AbortError") ? "timeout 9s" : (err && err.message) || "error tidak dikenal";
+      attempts.push(`${proxyName}: ${msg}`);
+      console.warn(`[${debugLabel||"fetchWithProxies"}] ${proxyName} gagal:`, msg);
       continue; // coba proxy berikutnya
     }
   }
-  throw lastErr || new Error("Semua proxy gagal");
+  const err = new Error(`semua ${CORS_PROXIES.length} proxy gagal → ` + attempts.join(" | "));
+  err.attempts = attempts;
+  throw err;
 }
 
 function parseRSSItems(xmlText, defaultSourceName){
@@ -531,8 +535,13 @@ async function fetchFromTradingEconomics(){
     if(!res.ok) throw new Error("status " + res.status);
     raw = await res.text();
   }catch(directErr){
-    console.warn("[TradingEconomics] fetch langsung gagal, coba lewat proxy:", directErr.message);
-    raw = await fetchWithProxies(url, "TradingEconomics"); // fallback lewat proxy kalau CORS langsung diblokir
+    const directMsg = (directErr && directErr.message) || "error tidak dikenal";
+    console.warn("[TradingEconomics] fetch langsung gagal (biasa karena CORS), coba lewat proxy:", directMsg);
+    try{
+      raw = await fetchWithProxies(url, "TradingEconomics");
+    }catch(proxyErr){
+      throw new Error(`fetch langsung: ${directMsg} | ${proxyErr.message}`);
+    }
   }
   let data;
   try{ data = JSON.parse(raw); }
@@ -554,17 +563,20 @@ async function fetchFromForexFactory(){
   const results = await Promise.allSettled(urls.map(u => fetchWithProxies(u, "ForexFactory")));
   let merged = [];
   let anySuccess = false;
+  const attempts = [];
   results.forEach((r, i) => {
+    const label = urls[i].includes("thisweek") ? "thisweek" : "nextweek";
     if(r.status === "fulfilled"){
       try{
         const parsed = JSON.parse(r.value);
         if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
-      }catch(e){ console.warn("[ForexFactory] respons bukan JSON valid (kemungkinan rate-limited):", e.message); }
+        else attempts.push(`${label}: bukan array JSON`);
+      }catch(e){ attempts.push(`${label}: JSON invalid (${e.message})`); }
     }else{
-      console.warn(`[ForexFactory] ${urls[i]} gagal:`, r.reason && r.reason.message);
+      attempts.push(`${label}: ${(r.reason && r.reason.message) || "gagal"}`);
     }
   });
-  if(!anySuccess) throw new Error("ForexFactory: semua proxy/URL gagal atau respons tidak valid");
+  if(!anySuccess) throw new Error(attempts.join(" || "));
   return merged.map(ev => ({
     title: ev.title, country: ev.country, impact: ev.impact,
     previous: ev.previous, forecast: ev.forecast, dateObj: new Date(ev.date)
@@ -719,7 +731,10 @@ async function loadCalendar(){
     console.error("[Kalender] TE gagal:", teRes.err && teRes.err.message);
     console.error("[Kalender] FF gagal:", ffRes.err && ffRes.err.message);
     grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Trading Economics &amp; ForexFactory).<br>
-      <span style="opacity:.7;font-size:12px">TE: ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>FF: ${escapeHTML((ffRes.err && ffRes.err.message) || "?")}</span><br>
+      <span style="opacity:.75;font-size:11px;display:inline-block;max-width:900px;white-space:normal;line-height:1.6;margin-top:8px">
+        <b>TE:</b> ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>
+        <b>FF:</b> ${escapeHTML((ffRes.err && ffRes.err.message) || "?")}
+      </span><br>
       <button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
     return;
   }
