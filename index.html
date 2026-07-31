@@ -200,6 +200,76 @@
     .cal-figures{ display:none; }
   }
 
+  /* ---- Month grid calendar ---- */
+  .cal-nav{
+    display:flex; align-items:center; justify-content:center; gap: 16px;
+    padding: 14px 16px; background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .cal-nav button{
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    width: 30px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 15px;
+    display:flex; align-items:center; justify-content:center;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .cal-nav button:hover{ border-color: var(--accent); color: var(--accent); }
+  .cal-nav .cal-month-label{
+    font-family:'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700;
+    min-width: 150px; text-align:center;
+  }
+  .cal-nav .cal-today-btn{
+    width:auto; padding: 0 12px; font-family:'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .cal-weekdays{
+    display:grid; grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .cal-weekdays span{
+    text-align:center; padding: 8px 0; font-family:'JetBrains Mono', monospace;
+    font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .cal-monthgrid{
+    display:grid; grid-template-columns: repeat(7, 1fr);
+  }
+  .cal-cell{
+    min-height: 62px; border-right: 1px solid var(--panel-border); border-bottom: 1px solid var(--panel-border);
+    padding: 6px; cursor: pointer; position: relative;
+    display:flex; flex-direction:column; gap: 4px;
+    transition: background .15s ease;
+  }
+  .cal-cell:nth-child(7n){ border-right: none; }
+  .cal-cell:hover{ background: rgba(255,255,255,0.03); }
+  .cal-cell.outside{ opacity: 0.28; cursor:default; }
+  .cal-cell.outside:hover{ background: transparent; }
+  .cal-cell.today{ background: rgba(76,139,245,0.07); }
+  .cal-cell.selected{ background: rgba(76,139,245,0.16); box-shadow: inset 0 0 0 1px var(--accent); }
+  .cal-cell .cal-date-num{
+    font-family:'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text);
+  }
+  .cal-cell.today .cal-date-num{ color: var(--accent); }
+  .cal-dots{ display:flex; gap: 3px; flex-wrap: wrap; margin-top: auto; }
+  .cal-dots .dot{ width: 6px; height: 6px; border-radius: 50%; }
+  .cal-dots .dot.high{ background: var(--bear); }
+  .cal-dots .dot.medium{ background: var(--watch); }
+  .cal-dots .dot.low{ background: var(--text-dim); }
+  .cal-count{
+    font-family:'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim);
+  }
+
+  .cal-daypanel{
+    border-top: 1px solid var(--panel-border);
+  }
+  .cal-daypanel-head{
+    font-family:'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 700;
+    color: var(--text); text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 10px 16px; background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .cal-scope-note{
+    font-size: 11.5px; color: var(--text-dim); padding: 10px 16px;
+    border-top: 1px solid var(--panel-border); line-height: 1.6;
+  }
+
   .loading, .errbox, .infobox{
     grid-column: 1/-1; text-align:center; padding: 40px 20px;
     color: var(--text-dim); font-family:'JetBrains Mono', monospace; font-size: 13px;
@@ -243,7 +313,20 @@
       <div class="chip" data-impact="Medium">🟡 Medium</div>
       <div class="chip" data-impact="Low">⚪ Low</div>
     </div>
-    <div class="cal-wrap" id="calGrid"><div class="loading">Memuat kalender ekonomi…</div></div>
+    <div class="cal-wrap" id="calWrap">
+      <div class="cal-nav">
+        <button id="calPrevBtn" title="Bulan sebelumnya">‹</button>
+        <div class="cal-month-label" id="calMonthLabel">—</div>
+        <button id="calNextBtn" title="Bulan berikutnya">›</button>
+        <button class="cal-today-btn" id="calTodayBtn">Hari ini</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+      </div>
+      <div class="cal-monthgrid" id="calMonthGrid"><div class="loading">Memuat kalender ekonomi…</div></div>
+      <div class="cal-daypanel" id="calDayPanel"></div>
+      <div class="cal-scope-note">📌 Data event hanya tersedia untuk ±2 minggu ke depan (mengikuti sumber data gratis ForexFactory). Bulan lain bisa tetap dijelajah, tapi tanggalnya belum ada data event.</div>
+    </div>
   </div>
 
   <!-- ===== CRYPTO NEWS SECTION ===== -->
@@ -334,14 +417,18 @@ const CORS_PROXIES = [
 async function fetchWithProxies(targetUrl){
   let lastErr;
   for(const buildProxyUrl of CORS_PROXIES){
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 detik per proxy, jangan sampai menggantung
     try{
-      const res = await fetch(buildProxyUrl(targetUrl));
+      const res = await fetch(buildProxyUrl(targetUrl), { signal: controller.signal });
+      clearTimeout(timeoutId);
       if(!res.ok) throw new Error("status " + res.status);
       const text = await res.text();
       if(!text || text.length < 30) throw new Error("respons kosong");
       return text;
     }catch(err){
-      lastErr = err;
+      clearTimeout(timeoutId);
+      lastErr = (err && err.name === "AbortError") ? new Error("timeout") : err;
       continue; // coba proxy berikutnya
     }
   }
@@ -400,46 +487,111 @@ async function fetchMergedFeeds(feedList){
   return merged;
 }
 
-/* ============ ECONOMIC CALENDAR (ForexFactory weekly JSON, no key) ============ */
-const CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-let calendarCache = [];
+/* ============ ECONOMIC CALENDAR (ForexFactory JSON, month-grid, no key) ============ */
+const CALENDAR_URLS = [
+  "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+  "https://nfs.faireconomy.media/ff_calendar_nextweek.json",
+];
+let calendarCache = [];        // semua event yang berhasil diambil (this week + next week)
 let activeImpact = "ALL";
+let calViewYear, calViewMonth; // bulan yang sedang ditampilkan di grid (0-based month)
+let calSelectedDateKey = null; // "YYYY-MM-DD" hari yang dipilih user
 
-function fmtDayHeader(d){
-  const today = new Date();
-  const isToday = d.toDateString() === today.toDateString();
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
-  const isTomorrow = d.toDateString() === tomorrow.toDateString();
-  const label = d.toLocaleDateString('id-ID', { weekday:'long', day:'2-digit', month:'long', timeZone:'Asia/Jakarta' });
-  if(isToday) return label + '<span class="today-badge">HARI INI</span>';
-  if(isTomorrow) return label + '<span class="today-badge">BESOK</span>';
-  return label;
+function dateKey(d){
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
 
-function renderCalendar(){
-  const wrap = document.getElementById('calGrid');
-  const filtered = activeImpact === "ALL"
-    ? calendarCache
-    : calendarCache.filter(ev => ev.impact === activeImpact);
-  if(filtered.length === 0){
-    wrap.innerHTML = `<div class="infobox">Tidak ada event untuk filter ini minggu ini.</div>`;
+function eventsForDate(dateKeyStr){
+  const filtered = activeImpact === "ALL" ? calendarCache : calendarCache.filter(ev => ev.impact === activeImpact);
+  return filtered.filter(ev => dateKey(ev.dateObj) === dateKeyStr).sort((a,b) => a.dateObj - b.dateObj);
+}
+
+function renderMonthGrid(){
+  const grid = document.getElementById('calMonthGrid');
+  const label = document.getElementById('calMonthLabel');
+  const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  label.textContent = monthNames[calViewMonth] + " " + calViewYear;
+
+  const firstOfMonth = new Date(calViewYear, calViewMonth, 1);
+  // Senin = 0 ... Minggu = 6
+  const firstWeekday = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(calViewYear, calViewMonth+1, 0).getDate();
+  const daysInPrevMonth = new Date(calViewYear, calViewMonth, 0).getDate();
+  const today = new Date();
+  const todayKey = dateKey(today);
+
+  const filtered = activeImpact === "ALL" ? calendarCache : calendarCache.filter(ev => ev.impact === activeImpact);
+  const countsByDay = {}; // key -> {high, medium, low}
+  filtered.forEach(ev => {
+    const k = dateKey(ev.dateObj);
+    if(!countsByDay[k]) countsByDay[k] = { high:0, medium:0, low:0 };
+    const imp = (ev.impact||"Low").toLowerCase();
+    if(countsByDay[k][imp] !== undefined) countsByDay[k][imp]++;
+  });
+
+  let cellsHTML = "";
+  const totalCells = 42; // 6 baris x 7 kolom, konsisten tingginya
+  for(let i=0; i<totalCells; i++){
+    const dayNum = i - firstWeekday + 1;
+    let cellDate, outside = false;
+    if(dayNum < 1){
+      cellDate = new Date(calViewYear, calViewMonth-1, daysInPrevMonth + dayNum);
+      outside = true;
+    } else if(dayNum > daysInMonth){
+      cellDate = new Date(calViewYear, calViewMonth+1, dayNum - daysInMonth);
+      outside = true;
+    } else {
+      cellDate = new Date(calViewYear, calViewMonth, dayNum);
+    }
+    const k = dateKey(cellDate);
+    const isToday = k === todayKey;
+    const isSelected = k === calSelectedDateKey;
+    const counts = countsByDay[k];
+    let dotsHTML = "", countLabel = "";
+    if(counts){
+      const total = counts.high + counts.medium + counts.low;
+      const dots = [];
+      if(counts.high) dots.push('<span class="dot high"></span>');
+      if(counts.medium) dots.push('<span class="dot medium"></span>');
+      if(counts.low) dots.push('<span class="dot low"></span>');
+      dotsHTML = `<div class="cal-dots">${dots.join("")}</div>`;
+      countLabel = `<div class="cal-count">${total} event</div>`;
+    }
+    cellsHTML += `
+    <div class="cal-cell ${outside?'outside':''} ${isToday?'today':''} ${isSelected?'selected':''}" data-datekey="${k}">
+      <div class="cal-date-num">${cellDate.getDate()}</div>
+      ${dotsHTML}${countLabel}
+    </div>`;
+  }
+  grid.innerHTML = cellsHTML;
+
+  grid.querySelectorAll('.cal-cell:not(.outside)').forEach(cell => {
+    cell.addEventListener('click', () => {
+      calSelectedDateKey = cell.dataset.datekey;
+      renderMonthGrid();
+      renderDayPanel();
+    });
+  });
+}
+
+function renderDayPanel(){
+  const panel = document.getElementById('calDayPanel');
+  if(!calSelectedDateKey){ panel.innerHTML = ""; return; }
+  const [y,m,d] = calSelectedDateKey.split("-").map(Number);
+  const dateObj = new Date(y, m-1, d);
+  const label = dateObj.toLocaleDateString('id-ID', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  const events = eventsForDate(calSelectedDateKey);
+
+  if(events.length === 0){
+    panel.innerHTML = `<div class="cal-daypanel-head">${label}</div><div class="infobox">Belum ada data event untuk tanggal ini (di luar cakupan ±2 minggu data gratis).</div>`;
     return;
   }
-  const now = Date.now();
-  let html = "";
-  let lastDayKey = null;
-  filtered.forEach(ev => {
-    const dayKey = ev.dateObj.toDateString();
-    if(dayKey !== lastDayKey){
-      html += `<div class="cal-day-head">${fmtDayHeader(ev.dateObj)}</div>`;
-      lastDayKey = dayKey;
-    }
-    const isPast = ev.dateObj.getTime() < now - 30*60*1000;
-    const isSoon = !isPast && (ev.dateObj.getTime() - now) < 60*60*1000;
+  let rowsHTML = events.map(ev => {
     const timeStr = ev.dateObj.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
     const impactClass = (ev.impact||"Low").toLowerCase();
-    html += `
-    <div class="cal-row ${isPast?'past':''} ${isSoon?'soon':''}">
+    const isPast = ev.dateObj.getTime() < Date.now() - 30*60*1000;
+    return `
+    <div class="cal-row ${isPast?'past':''}">
       <div class="cal-time">${timeStr}</div>
       <div class="cal-impact ${impactClass}" title="${escapeHTML(ev.impact||'')}"></div>
       <div class="cal-ccy">${escapeHTML(ev.country||'')}</div>
@@ -449,25 +601,65 @@ function renderCalendar(){
         <span>Forecast: <b>${escapeHTML(ev.forecast||'—')}</b></span>
       </div>
     </div>`;
-  });
-  wrap.innerHTML = html;
+  }).join("");
+  panel.innerHTML = `<div class="cal-daypanel-head">${label} · ${events.length} event</div>${rowsHTML}`;
 }
 
+document.getElementById('calPrevBtn').addEventListener('click', () => {
+  calViewMonth--;
+  if(calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+  renderMonthGrid();
+});
+document.getElementById('calNextBtn').addEventListener('click', () => {
+  calViewMonth++;
+  if(calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+  renderMonthGrid();
+});
+document.getElementById('calTodayBtn').addEventListener('click', () => {
+  const today = new Date();
+  calViewYear = today.getFullYear();
+  calViewMonth = today.getMonth();
+  calSelectedDateKey = dateKey(today);
+  renderMonthGrid();
+  renderDayPanel();
+});
+
 async function loadCalendar(){
-  const wrap = document.getElementById('calGrid');
-  wrap.innerHTML = `<div class="loading">Memuat kalender ekonomi…</div>`;
+  const grid = document.getElementById('calMonthGrid');
+  grid.innerHTML = `<div class="loading">Memuat kalender ekonomi…</div>`;
   try{
-    const raw = await fetchWithProxies(CALENDAR_URL);
-    const data = JSON.parse(raw);
-    if(!Array.isArray(data)) throw new Error("Format kalender tidak dikenali");
-    calendarCache = data
+    const results = await Promise.allSettled(CALENDAR_URLS.map(u => fetchWithProxies(u)));
+    let merged = [];
+    let anySuccess = false;
+    results.forEach(r => {
+      if(r.status === "fulfilled"){
+        try{
+          const parsed = JSON.parse(r.value);
+          if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
+        }catch(e){ /* lewati kalau JSON rusak */ }
+      }
+    });
+    if(!anySuccess) throw new Error("Semua sumber kalender gagal dimuat");
+    // dedup berdasarkan title+date, lalu simpan
+    const seen = new Set();
+    calendarCache = merged
       .map(ev => ({ ...ev, dateObj: new Date(ev.date) }))
       .filter(ev => !isNaN(ev.dateObj.getTime()))
+      .filter(ev => {
+        const key = ev.title + "|" + ev.date + "|" + ev.country;
+        if(seen.has(key)) return false;
+        seen.add(key); return true;
+      })
       .sort((a,b) => a.dateObj - b.dateObj);
-    renderCalendar();
+
+    const today = new Date();
+    if(calViewYear === undefined){ calViewYear = today.getFullYear(); calViewMonth = today.getMonth(); }
+    if(calSelectedDateKey === null) calSelectedDateKey = dateKey(today);
+    renderMonthGrid();
+    renderDayPanel();
     document.getElementById('calLastUpdate').textContent = nowStr();
   }catch(err){
-    wrap.innerHTML = `<div class="errbox">Gagal memuat kalender: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
+    grid.innerHTML = `<div class="errbox">Gagal memuat kalender: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
   }
 }
 
@@ -477,7 +669,8 @@ document.getElementById('calChips').addEventListener('click', (e) => {
   document.querySelectorAll('#calChips .chip').forEach(c => c.classList.remove('active'));
   chip.classList.add('active');
   activeImpact = chip.dataset.impact;
-  renderCalendar();
+  renderMonthGrid();
+  renderDayPanel();
 });
 
 /* ============ CRYPTO NEWS (RSS: Cointelegraph + CoinDesk) ============ */
