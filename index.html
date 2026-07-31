@@ -412,23 +412,31 @@ const CORS_PROXIES = [
   url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
   url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
   url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+  url => "https://api.allorigins.win/get?url=" + encodeURIComponent(url), // varian allorigins (bungkus JSON, contents diambil di bawah)
+  url => "https://thingproxy.freeboard.io/fetch/" + url,
 ];
 
-async function fetchWithProxies(targetUrl){
+async function fetchWithProxies(targetUrl, debugLabel){
   let lastErr;
   for(const buildProxyUrl of CORS_PROXIES){
+    const proxyUrl = buildProxyUrl(targetUrl);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 detik per proxy, jangan sampai menggantung
+    const timeoutId = setTimeout(() => controller.abort(), 9000); // 9 detik per proxy, proxy gratisan kadang lambat
     try{
-      const res = await fetch(buildProxyUrl(targetUrl), { signal: controller.signal });
+      const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       if(!res.ok) throw new Error("status " + res.status);
-      const text = await res.text();
+      let text = await res.text();
+      // varian allorigins "get" membungkus hasil dalam JSON { contents: "..." }
+      if(proxyUrl.includes("allorigins.win/get?url=")){
+        try{ const wrapped = JSON.parse(text); text = wrapped.contents || ""; }catch(e){ /* biarkan apa adanya */ }
+      }
       if(!text || text.length < 30) throw new Error("respons kosong");
       return text;
     }catch(err){
       clearTimeout(timeoutId);
       lastErr = (err && err.name === "AbortError") ? new Error("timeout") : err;
+      console.warn(`[${debugLabel||"fetchWithProxies"}] proxy gagal (${proxyUrl}):`, lastErr.message);
       continue; // coba proxy berikutnya
     }
   }
@@ -520,10 +528,13 @@ async function fetchFromTradingEconomics(){
     if(!res.ok) throw new Error("status " + res.status);
     raw = await res.text();
   }catch(directErr){
-    raw = await fetchWithProxies(url); // fallback lewat proxy kalau CORS langsung diblokir
+    console.warn("[TradingEconomics] fetch langsung gagal, coba lewat proxy:", directErr.message);
+    raw = await fetchWithProxies(url, "TradingEconomics"); // fallback lewat proxy kalau CORS langsung diblokir
   }
-  const data = JSON.parse(raw);
-  if(!Array.isArray(data)) throw new Error("Format TE tidak dikenali");
+  let data;
+  try{ data = JSON.parse(raw); }
+  catch(e){ throw new Error("TE: respons bukan JSON valid (kemungkinan diblokir/rate-limited) — " + raw.slice(0,80)); }
+  if(!Array.isArray(data)) throw new Error("TE: format tidak dikenali — " + JSON.stringify(data).slice(0,120));
   return data.map(ev => ({
     title: ev.Event || ev.Category || "Event",
     country: ccyFor(ev.Country),
@@ -537,18 +548,20 @@ async function fetchFromTradingEconomics(){
 /* Strategi 2 (fallback): ForexFactory JSON mingguan lewat proxy */
 async function fetchFromForexFactory(){
   const urls = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json", "https://nfs.faireconomy.media/ff_calendar_nextweek.json"];
-  const results = await Promise.allSettled(urls.map(u => fetchWithProxies(u)));
+  const results = await Promise.allSettled(urls.map(u => fetchWithProxies(u, "ForexFactory")));
   let merged = [];
   let anySuccess = false;
-  results.forEach(r => {
+  results.forEach((r, i) => {
     if(r.status === "fulfilled"){
       try{
         const parsed = JSON.parse(r.value);
         if(Array.isArray(parsed)){ anySuccess = true; merged = merged.concat(parsed); }
-      }catch(e){ /* respons bukan JSON valid (kemungkinan rate-limited), lewati */ }
+      }catch(e){ console.warn("[ForexFactory] respons bukan JSON valid (kemungkinan rate-limited):", e.message); }
+    }else{
+      console.warn(`[ForexFactory] ${urls[i]} gagal:`, r.reason && r.reason.message);
     }
   });
-  if(!anySuccess) throw new Error("ForexFactory juga gagal");
+  if(!anySuccess) throw new Error("ForexFactory: semua proxy/URL gagal atau respons tidak valid");
   return merged.map(ev => ({
     title: ev.title, country: ev.country, impact: ev.impact,
     previous: ev.previous, forecast: ev.forecast, dateObj: new Date(ev.date)
@@ -687,17 +700,25 @@ async function loadCalendar(){
   grid.innerHTML = `<div class="loading">Memuat kalender ekonomi…</div>`;
   let events = null;
   let sourceUsed = "";
-  try{
-    events = await fetchFromTradingEconomics();
-    sourceUsed = "Trading Economics";
-  }catch(teErr){
-    try{
-      events = await fetchFromForexFactory();
-      sourceUsed = "ForexFactory";
-    }catch(ffErr){
-      grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Trading Economics &amp; ForexFactory).<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
-      return;
-    }
+
+  // Jalankan kedua sumber secara PARALEL: siapa yang berhasil duluan, dipakai duluan.
+  // Ini jauh lebih cepat & lebih tahan gagal dibanding coba TE dulu baru FF setelah TE benar-benar habis semua proxy-nya.
+  const teP = fetchFromTradingEconomics().then(evs => ({ ok: true, evs, src: "Trading Economics" }))
+    .catch(err => ({ ok: false, err, src: "Trading Economics" }));
+  const ffP = fetchFromForexFactory().then(evs => ({ ok: true, evs, src: "ForexFactory" }))
+    .catch(err => ({ ok: false, err, src: "ForexFactory" }));
+
+  const [teRes, ffRes] = await Promise.all([teP, ffP]);
+
+  if(teRes.ok){ events = teRes.evs; sourceUsed = "Trading Economics"; }
+  else if(ffRes.ok){ events = ffRes.evs; sourceUsed = "ForexFactory"; }
+  else{
+    console.error("[Kalender] TE gagal:", teRes.err && teRes.err.message);
+    console.error("[Kalender] FF gagal:", ffRes.err && ffRes.err.message);
+    grid.innerHTML = `<div class="errbox">Gagal memuat kalender dari semua sumber (Trading Economics &amp; ForexFactory).<br>
+      <span style="opacity:.7;font-size:12px">TE: ${escapeHTML((teRes.err && teRes.err.message) || "?")}<br>FF: ${escapeHTML((ffRes.err && ffRes.err.message) || "?")}</span><br>
+      <button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
+    return;
   }
 
   const seen = new Set();
