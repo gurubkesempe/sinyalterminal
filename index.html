@@ -153,6 +153,53 @@
     padding: 3px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em;
   }
 
+  /* ---- Economic calendar ---- */
+  .cal-wrap{
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .cal-day-head{
+    font-family:'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 700;
+    color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 16px; background: rgba(255,255,255,0.02);
+    border-top: 1px solid var(--panel-border); border-bottom: 1px solid var(--panel-border);
+  }
+  .cal-day-head:first-child{ border-top: none; }
+  .cal-day-head .today-badge{
+    background: rgba(76,139,245,0.15); color: var(--accent);
+    padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-size: 10px;
+  }
+  .cal-row{
+    display:flex; align-items:center; gap: 14px;
+    padding: 11px 16px; border-bottom: 1px solid var(--panel-border);
+    font-size: 13px;
+  }
+  .cal-row:last-child{ border-bottom: none; }
+  .cal-row.past{ opacity: 0.45; }
+  .cal-row.soon{ background: rgba(240,185,11,0.05); }
+  .cal-time{
+    font-family:'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600;
+    color: var(--text); min-width: 52px; flex-shrink: 0;
+  }
+  .cal-ccy{
+    font-family:'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,0.05); color: var(--text);
+    padding: 3px 8px; border-radius: 5px; min-width: 40px; text-align:center; flex-shrink: 0;
+  }
+  .cal-impact{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cal-impact.high{ background: var(--bear); }
+  .cal-impact.medium{ background: var(--watch); }
+  .cal-impact.low{ background: var(--text-dim); }
+  .cal-event{ flex: 1; min-width: 120px; }
+  .cal-figures{
+    display:flex; gap: 14px; font-family:'JetBrains Mono', monospace; font-size: 11.5px;
+    color: var(--text-dim); flex-shrink: 0;
+  }
+  .cal-figures b{ color: var(--text); }
+  @media (max-width: 700px){
+    .cal-figures{ display:none; }
+  }
+
   .loading, .errbox, .infobox{
     grid-column: 1/-1; text-align:center; padding: 40px 20px;
     color: var(--text-dim); font-family:'JetBrains Mono', monospace; font-size: 13px;
@@ -184,6 +231,21 @@
     ⚠️ Ini agregator berita, bukan rekomendasi atau nasihat keuangan. Selalu cek ulang sumber aslinya dan konfirmasi di chart Exness sebelum entry, dan gunakan stop loss.
   </div>
 
+  <!-- ===== ECONOMIC CALENDAR SECTION ===== -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Kalender Ekonomi <span class="tag live">● live · ForexFactory</span></div>
+      <div class="section-meta">Zona waktu: <span>WIB (GMT+7)</span> · Terakhir: <span id="calLastUpdate">—</span> <button class="ghost" style="margin-left:10px" onclick="loadCalendar()">Refresh</button></div>
+    </div>
+    <div class="chips" id="calChips">
+      <div class="chip active" data-impact="ALL">Semua</div>
+      <div class="chip" data-impact="High">🔴 High</div>
+      <div class="chip" data-impact="Medium">🟡 Medium</div>
+      <div class="chip" data-impact="Low">⚪ Low</div>
+    </div>
+    <div class="cal-wrap" id="calGrid"><div class="loading">Memuat kalender ekonomi…</div></div>
+  </div>
+
   <!-- ===== CRYPTO NEWS SECTION ===== -->
   <div class="section">
     <div class="section-head">
@@ -211,7 +273,7 @@
   </div>
 
   <footer>
-    Sumber: berita crypto dari CryptoCompare News API (real-time, tanpa API key). Berita forex dari feed RSS ForexLive, diambil lewat proxy CORS publik. Auto-refresh: crypto tiap 2 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
+    Sumber: kalender ekonomi dari data mingguan ForexFactory (jam ditampilkan dalam WIB). Berita crypto dari RSS Cointelegraph &amp; CoinDesk. Berita forex dari RSS ForexLive &amp; FXStreet. Semua diambil lewat proxy CORS publik dengan fallback berlapis, tanpa API key. Auto-refresh: kalender tiap 15 menit, crypto tiap 3 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
   </footer>
 
 </div>
@@ -338,6 +400,86 @@ async function fetchMergedFeeds(feedList){
   return merged;
 }
 
+/* ============ ECONOMIC CALENDAR (ForexFactory weekly JSON, no key) ============ */
+const CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+let calendarCache = [];
+let activeImpact = "ALL";
+
+function fmtDayHeader(d){
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+  const label = d.toLocaleDateString('id-ID', { weekday:'long', day:'2-digit', month:'long', timeZone:'Asia/Jakarta' });
+  if(isToday) return label + '<span class="today-badge">HARI INI</span>';
+  if(isTomorrow) return label + '<span class="today-badge">BESOK</span>';
+  return label;
+}
+
+function renderCalendar(){
+  const wrap = document.getElementById('calGrid');
+  const filtered = activeImpact === "ALL"
+    ? calendarCache
+    : calendarCache.filter(ev => ev.impact === activeImpact);
+  if(filtered.length === 0){
+    wrap.innerHTML = `<div class="infobox">Tidak ada event untuk filter ini minggu ini.</div>`;
+    return;
+  }
+  const now = Date.now();
+  let html = "";
+  let lastDayKey = null;
+  filtered.forEach(ev => {
+    const dayKey = ev.dateObj.toDateString();
+    if(dayKey !== lastDayKey){
+      html += `<div class="cal-day-head">${fmtDayHeader(ev.dateObj)}</div>`;
+      lastDayKey = dayKey;
+    }
+    const isPast = ev.dateObj.getTime() < now - 30*60*1000;
+    const isSoon = !isPast && (ev.dateObj.getTime() - now) < 60*60*1000;
+    const timeStr = ev.dateObj.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Jakarta' });
+    const impactClass = (ev.impact||"Low").toLowerCase();
+    html += `
+    <div class="cal-row ${isPast?'past':''} ${isSoon?'soon':''}">
+      <div class="cal-time">${timeStr}</div>
+      <div class="cal-impact ${impactClass}" title="${escapeHTML(ev.impact||'')}"></div>
+      <div class="cal-ccy">${escapeHTML(ev.country||'')}</div>
+      <div class="cal-event">${escapeHTML(ev.title||'')}</div>
+      <div class="cal-figures">
+        <span>Prev: <b>${escapeHTML(ev.previous||'—')}</b></span>
+        <span>Forecast: <b>${escapeHTML(ev.forecast||'—')}</b></span>
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+async function loadCalendar(){
+  const wrap = document.getElementById('calGrid');
+  wrap.innerHTML = `<div class="loading">Memuat kalender ekonomi…</div>`;
+  try{
+    const raw = await fetchWithProxies(CALENDAR_URL);
+    const data = JSON.parse(raw);
+    if(!Array.isArray(data)) throw new Error("Format kalender tidak dikenali");
+    calendarCache = data
+      .map(ev => ({ ...ev, dateObj: new Date(ev.date) }))
+      .filter(ev => !isNaN(ev.dateObj.getTime()))
+      .sort((a,b) => a.dateObj - b.dateObj);
+    renderCalendar();
+    document.getElementById('calLastUpdate').textContent = nowStr();
+  }catch(err){
+    wrap.innerHTML = `<div class="errbox">Gagal memuat kalender: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadCalendar()">Coba lagi</button></div>`;
+  }
+}
+
+document.getElementById('calChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('#calChips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  activeImpact = chip.dataset.impact;
+  renderCalendar();
+});
+
 /* ============ CRYPTO NEWS (RSS: Cointelegraph + CoinDesk) ============ */
 const CRYPTO_FEEDS = [
   { url: "https://cointelegraph.com/rss", name: "Cointelegraph" },
@@ -416,8 +558,10 @@ async function loadForexNews(){
 }
 
 /* ============ Init & auto-refresh ============ */
+loadCalendar();
 loadCryptoNews();
 loadForexNews();
+setInterval(loadCalendar, 15 * 60 * 1000);    // kalender: tiap 15 menit (jaga rate limit sumber)
 setInterval(loadCryptoNews, 3 * 60 * 1000);   // crypto news: tiap 3 menit
 setInterval(loadForexNews, 5 * 60 * 1000);    // forex news: tiap 5 menit
 </script>
