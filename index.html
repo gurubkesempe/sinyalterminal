@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sinyal Terminal — EMA/RSI Dashboard</title>
+<title>Market News Terminal — Crypto &amp; Forex</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -87,26 +87,6 @@
   .section-meta{ font-family:'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
   .section-meta span{ color: var(--text); }
 
-  /* ---- API key box ---- */
-  .keybox{
-    background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
-    display:flex; gap: 10px; align-items:center; flex-wrap: wrap;
-  }
-  .keybox p{ font-size: 12px; color: var(--text-dim); flex: 1 1 260px; line-height:1.5; }
-  .keybox a{ color: var(--accent); text-decoration:none; }
-  .keybox input{
-    background: #0d1015; border: 1px solid var(--panel-border); color: var(--text);
-    font-family:'JetBrains Mono', monospace; font-size: 12px;
-    padding: 8px 10px; border-radius: 6px; width: 220px;
-  }
-  .keybox button{
-    background: var(--accent); border:none; color:#0a0c10; font-weight:600;
-    font-family:'JetBrains Mono', monospace; font-size: 12px;
-    padding: 8px 14px; border-radius: 6px; cursor:pointer;
-  }
-  .keybox .status{ font-family:'JetBrains Mono', monospace; font-size: 11px; color: var(--bull); }
-
   button.ghost{
     background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
     font-family:'JetBrains Mono', monospace; font-size: 12px;
@@ -116,53 +96,62 @@
   button.ghost:hover{ border-color: var(--accent); color: var(--accent); }
   button.ghost:disabled{ opacity:.5; cursor:default; }
 
+  /* ---- Filter chips ---- */
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 14px; }
+  .chip{
+    font-family:'JetBrains Mono', monospace; font-size: 11px;
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text-dim);
+    padding: 6px 12px; border-radius: 20px; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .chip:hover{ color: var(--text); border-color: #2a3342; }
+  .chip.active{ background: rgba(76,139,245,0.12); border-color: var(--accent); color: var(--accent); }
+
   /* ---- Grid / Cards ---- */
   .grid{
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
   }
   .card{
     background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 10px; padding: 18px; position: relative; overflow: hidden;
+    border-radius: 10px; overflow: hidden; position: relative;
     transition: border-color .2s ease;
+    display:flex; flex-direction:column;
   }
   .card:hover{ border-color: #2a3342; }
-  .card::before{ content:""; position:absolute; top:0; left:0; right:0; height:2px; }
-  .card.bull::before{ background: var(--bull); }
-  .card.bear::before{ background: var(--bear); }
-  .card.watch::before{ background: var(--watch); }
+  .card a.card-link{ color:inherit; text-decoration:none; display:flex; flex-direction:column; height:100%; }
 
-  .pair-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 14px; }
-  .pair-name{ font-family:'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
-  .pair-sub{ font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-
-  .badge{
-    font-family:'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
-    padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap: 6px;
-    letter-spacing: 0.04em;
+  .card-img{
+    width:100%; height: 150px; object-fit: cover;
+    background: #0d1015; display:block;
+    border-bottom: 1px solid var(--panel-border);
   }
-  .badge .dot{ width:6px; height:6px; border-radius:50%; }
-  .badge.bull{ background: rgba(22,199,132,0.12); color: var(--bull); }
-  .badge.bull .dot{ background: var(--bull); animation: pulse 1.6s infinite; }
-  .badge.bear{ background: rgba(234,57,67,0.12); color: var(--bear); }
-  .badge.bear .dot{ background: var(--bear); animation: pulse 1.6s infinite; }
-  .badge.watch{ background: rgba(240,185,11,0.1); color: var(--watch); }
-  .badge.watch .dot{ background: var(--watch); }
+  .card-body{ padding: 16px; display:flex; flex-direction:column; gap:10px; flex:1; }
 
-  .price-row{ display:flex; align-items:baseline; gap:10px; margin-bottom: 14px; flex-wrap: wrap; }
-  .price{ font-family:'JetBrains Mono', monospace; font-size: 24px; font-weight: 600; }
-  .chg{ font-family:'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
-  .chg.up{ color: var(--bull); }
-  .chg.down{ color: var(--bear); }
+  .card-meta-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .source-badge{
+    font-family:'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px; letter-spacing: 0.03em;
+    background: rgba(76,139,245,0.12); color: var(--accent);
+    white-space: nowrap; overflow:hidden; text-overflow: ellipsis; max-width: 140px;
+  }
+  .time-ago{ font-family:'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); white-space:nowrap; }
 
-  .stats{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-  .stat{ background: rgba(255,255,255,0.02); border-radius: 6px; padding: 8px 10px; }
-  .stat-label{ font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
-  .stat-value{ font-family:'JetBrains Mono', monospace; font-size: 13px; margin-top: 3px; }
-
-  .spark{ width: 100%; height: 44px; display:block; }
-  .note{ font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
+  .news-title{
+    font-family:'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700;
+    line-height: 1.35; letter-spacing: -0.005em;
+  }
+  .news-excerpt{
+    font-size: 12.5px; color: var(--text-dim); line-height: 1.55;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .tags-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top: auto; padding-top: 4px; }
+  .tag-pill{
+    font-family:'JetBrains Mono', monospace; font-size: 9.5px;
+    background: rgba(255,255,255,0.04); color: var(--text-dim);
+    padding: 3px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
 
   .loading, .errbox, .infobox{
     grid-column: 1/-1; text-align:center; padding: 40px 20px;
@@ -186,258 +175,203 @@
 
   <header>
     <div class="title-block">
-      <h1><span class="live-dot"></span>Sinyal Terminal</h1>
-      <p>Dashboard EMA 12/26 &amp; RSI 14 — bantu keputusan entry manual, bukan robot otomatis</p>
+      <h1><span class="live-dot"></span>Market News Terminal</h1>
+      <p>Berita crypto &amp; forex real-time — konteks buat entry, bukan sinyal otomatis</p>
     </div>
   </header>
 
   <div class="disclaimer">
-    ⚠️ Sinyal EMA/RSI di sini adalah alat bantu baca momentum, bukan rekomendasi atau jaminan profit. Selalu konfirmasi ulang di chart Exness sebelum entry, dan gunakan stop loss. Harga crypto real-time dari Binance; harga forex tergantung apakah kamu sudah pasang API key (lihat bagian Forex di bawah).
+    ⚠️ Ini agregator berita, bukan rekomendasi atau nasihat keuangan. Selalu cek ulang sumber aslinya dan konfirmasi di chart Exness sebelum entry, dan gunakan stop loss.
   </div>
 
-  <!-- ===== CRYPTO SECTION ===== -->
+  <!-- ===== CRYPTO NEWS SECTION ===== -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Crypto <span class="tag live">● live · Binance</span></div>
-      <div class="section-meta">Update tiap 30 detik · Terakhir: <span id="cryptoLastUpdate">—</span></div>
+      <div class="section-title">Berita Crypto <span class="tag live">● live · CryptoCompare</span></div>
+      <div class="section-meta">Terakhir: <span id="cryptoLastUpdate">—</span> <button class="ghost" style="margin-left:10px" onclick="loadCryptoNews()">Refresh</button></div>
     </div>
-    <div class="grid" id="cryptoGrid"><div class="loading">Memuat data crypto…</div></div>
+    <div class="chips" id="cryptoChips">
+      <div class="chip active" data-cat="ALL">Semua</div>
+      <div class="chip" data-cat="BTC">Bitcoin</div>
+      <div class="chip" data-cat="ETH">Ethereum</div>
+      <div class="chip" data-cat="Trading">Trading</div>
+      <div class="chip" data-cat="Market">Market</div>
+      <div class="chip" data-cat="Regulation">Regulasi</div>
+    </div>
+    <div class="grid" id="cryptoGrid"><div class="loading">Memuat berita crypto…</div></div>
   </div>
 
-  <!-- ===== FOREX SECTION ===== -->
+  <!-- ===== FOREX NEWS SECTION ===== -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Forex <span class="tag" id="forexTag">delayed · harian</span></div>
-      <div class="section-meta">Terakhir: <span id="forexLastUpdate">—</span></div>
+      <div class="section-title">Berita Forex <span class="tag delayed">● live · ForexLive</span></div>
+      <div class="section-meta">Terakhir: <span id="forexLastUpdate">—</span> <button class="ghost" style="margin-left:10px" onclick="loadForexNews()">Refresh</button></div>
     </div>
-
-    <div class="keybox">
-      <p>
-        Mau update forex tiap beberapa menit (bukan cuma harian)? Pasang API key gratis dari
-        <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">Twelve Data</a> (daftar ~2 menit, gratis, tanpa kartu kredit).
-        Key disimpan di browser kamu sendiri saja.
-      </p>
-      <input type="text" id="apiKeyInput" placeholder="Tempel API key Twelve Data di sini">
-      <button onclick="saveApiKey()">Simpan</button>
-      <button class="ghost" id="clearKeyBtn" onclick="clearApiKey()" style="display:none;">Hapus key</button>
-      <span class="status" id="keyStatus"></span>
-    </div>
-
-    <div class="grid" id="forexGrid"><div class="loading">Memuat data forex…</div></div>
+    <div class="grid" id="forexGrid"><div class="loading">Memuat berita forex…</div></div>
   </div>
 
   <footer>
-    Metodologi: EMA cepat (12) &amp; EMA lambat (26), plus RSI(14). Sinyal <strong>BUY</strong> = EMA12 baru saja memotong ke atas EMA26 dengan RSI di atas 50. Sinyal <strong>SELL</strong> = EMA12 memotong ke bawah EMA26 dengan RSI di bawah 50. <strong>BIAS NAIK/TURUN</strong> = tren berjalan tanpa cross baru hari ini. Crypto pakai candle 1 jam dari Binance (tanpa API key). Forex pakai candle 15 menit dari Twelve Data (kalau API key terpasang) atau kurs harian ECB via Frankfurter (kalau belum). Bukan nasihat keuangan.
+    Sumber: berita crypto dari CryptoCompare News API (real-time, tanpa API key). Berita forex dari feed RSS ForexLive, diambil lewat proxy CORS publik. Auto-refresh: crypto tiap 2 menit, forex tiap 5 menit. Klik judul berita untuk buka artikel lengkap di sumber aslinya. Bukan nasihat keuangan.
   </footer>
 
 </div>
 
 <script>
-/* ============ Shared indicator math ============ */
-function calcEMA(values, period){
-  const ema = new Array(values.length).fill(null);
-  if(values.length < period) return ema;
-  const k = 2/(period+1);
-  let sma = 0;
-  for(let i=0;i<period;i++) sma += values[i];
-  sma /= period;
-  ema[period-1] = sma;
-  for(let i=period;i<values.length;i++) ema[i] = values[i]*k + ema[i-1]*(1-k);
-  return ema;
-}
-function calcRSI(values, period=14){
-  const rsi = new Array(values.length).fill(null);
-  if(values.length < period+1) return rsi;
-  let gains=0, losses=0;
-  for(let i=1;i<=period;i++){
-    const diff = values[i]-values[i-1];
-    if(diff>=0) gains+=diff; else losses-=diff;
-  }
-  let avgGain=gains/period, avgLoss=losses/period;
-  rsi[period] = avgLoss===0 ? 100 : 100-(100/(1+(avgGain/avgLoss)));
-  for(let i=period+1;i<values.length;i++){
-    const diff = values[i]-values[i-1];
-    const gain = diff>0?diff:0, loss = diff<0?-diff:0;
-    avgGain = (avgGain*(period-1)+gain)/period;
-    avgLoss = (avgLoss*(period-1)+loss)/period;
-    rsi[i] = avgLoss===0 ? 100 : 100-(100/(1+(avgGain/avgLoss)));
-  }
-  return rsi;
-}
-function sparkSVG(values){
-  const w=260, h=44, pad=4;
-  const min=Math.min(...values), max=Math.max(...values);
-  const range=(max-min)||1;
-  const step=(w-pad*2)/(values.length-1);
-  const pts = values.map((v,i)=>{
-    const x = pad+i*step;
-    const y = h-pad-((v-min)/range)*(h-pad*2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  const up = values[values.length-1] >= values[0];
-  const color = up ? "var(--bull)" : "var(--bear)";
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  </svg>`;
-}
-function signalFromSeries(closes){
-  const emaFast = calcEMA(closes,12), emaSlow = calcEMA(closes,26), rsi = calcRSI(closes,14);
-  const n = closes.length;
-  const fLast=emaFast[n-1], sLast=emaSlow[n-1], fPrev=emaFast[n-2], sPrev=emaSlow[n-2], rLast=rsi[n-1];
-  let signal="watch", label="WATCH";
-  if(fLast!=null && sLast!=null && fPrev!=null && sPrev!=null){
-    const crossedUp = (fPrev<=sPrev) && (fLast>sLast);
-    const crossedDown = (fPrev>=sPrev) && (fLast<sLast);
-    if(crossedUp && rLast>50){ signal="bull"; label="BUY"; }
-    else if(crossedDown && rLast<50){ signal="bear"; label="SELL"; }
-    else if(fLast>sLast){ signal="watch"; label="BIAS NAIK"; }
-    else { signal="watch"; label="BIAS TURUN"; }
-  }
-  return { signal, label, fLast, sLast, rLast };
-}
-function cardHTML({name, sub, decimals, closes, lastLabel}){
-  const {signal,label,fLast,sLast,rLast} = signalFromSeries(closes);
-  const n = closes.length;
-  const lastClose = closes[n-1], prevClose = closes[n-2];
-  const chg = ((lastClose-prevClose)/prevClose)*100;
-  const spark = sparkSVG(closes.slice(-30));
-  return `
-  <div class="card ${signal}">
-    <div class="pair-row">
-      <div><div class="pair-name">${name}</div><div class="pair-sub">${sub}</div></div>
-      <div class="badge ${signal}"><span class="dot"></span>${label}</div>
-    </div>
-    <div class="price-row">
-      <div class="price">${lastClose.toFixed(decimals)}</div>
-      <div class="chg ${chg>=0?'up':'down'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</div>
-    </div>
-    <div class="stats">
-      <div class="stat"><div class="stat-label">EMA 12</div><div class="stat-value">${fLast?.toFixed(decimals) ?? '—'}</div></div>
-      <div class="stat"><div class="stat-label">EMA 26</div><div class="stat-value">${sLast?.toFixed(decimals) ?? '—'}</div></div>
-      <div class="stat"><div class="stat-label">RSI 14</div><div class="stat-value">${rLast?.toFixed(1) ?? '—'}</div></div>
-    </div>
-    ${spark}
-    <div class="note">${lastLabel}</div>
-  </div>`;
+/* ============ Helpers ============ */
+function timeAgo(unixOrDate){
+  const ts = (unixOrDate instanceof Date) ? unixOrDate.getTime() : unixOrDate*1000;
+  const diffSec = Math.floor((Date.now()-ts)/1000);
+  if(diffSec < 60) return "baru saja";
+  const diffMin = Math.floor(diffSec/60);
+  if(diffMin < 60) return diffMin + " menit lalu";
+  const diffHour = Math.floor(diffMin/60);
+  if(diffHour < 24) return diffHour + " jam lalu";
+  const diffDay = Math.floor(diffHour/24);
+  return diffDay + " hari lalu";
 }
 function nowStr(){
   return new Date().toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'short' });
 }
+function escapeHTML(str){
+  if(!str) return "";
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function stripHTML(str){
+  if(!str) return "";
+  const div = document.createElement('div');
+  div.innerHTML = str;
+  return div.textContent || div.innerText || "";
+}
+function newsCardHTML({title, url, source, time, image, excerpt, tags}){
+  const img = image ? `<img class="card-img" src="${escapeHTML(image)}" onerror="this.remove()" loading="lazy">` : "";
+  const tagPills = (tags||[]).slice(0,3).map(t => `<span class="tag-pill">${escapeHTML(t)}</span>`).join("");
+  return `
+  <div class="card">
+    <a class="card-link" href="${escapeHTML(url)}" target="_blank" rel="noopener">
+      ${img}
+      <div class="card-body">
+        <div class="card-meta-row">
+          <span class="source-badge">${escapeHTML(source)}</span>
+          <span class="time-ago">${escapeHTML(time)}</span>
+        </div>
+        <div class="news-title">${escapeHTML(title)}</div>
+        <div class="news-excerpt">${escapeHTML(excerpt)}</div>
+        <div class="tags-row">${tagPills}</div>
+      </div>
+    </a>
+  </div>`;
+}
 
-/* ============ CRYPTO (Binance, no key) ============ */
-const CRYPTO_PAIRS = [
-  { symbol:"BTCUSDT", label:"BTC/USDT" },
-  { symbol:"ETHUSDT", label:"ETH/USDT" },
-  { symbol:"BNBUSDT", label:"BNB/USDT" },
-  { symbol:"SOLUSDT", label:"SOL/USDT" },
-  { symbol:"XRPUSDT", label:"XRP/USDT" },
-];
-function decimalsForPrice(p){
-  if(p>=100) return 2;
-  if(p>=1) return 4;
-  return 6;
-}
-async function fetchCrypto(pair){
-  const url = `https://api.binance.com/api/v3/klines?symbol=${pair.symbol}&interval=1h&limit=100`;
+/* ============ CRYPTO NEWS (CryptoCompare, no key) ============ */
+let cryptoNewsCache = [];
+let activeCryptoCat = "ALL";
+
+async function fetchCryptoNews(){
+  const url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest";
   const res = await fetch(url);
-  if(!res.ok) throw new Error("Gagal ambil " + pair.label);
-  const raw = await res.json();
-  return raw.map(c => parseFloat(c[4])); // index 4 = close price
+  if(!res.ok) throw new Error("Gagal ambil berita crypto (status " + res.status + ")");
+  const data = await res.json();
+  if(!data.Data) throw new Error("Format data tidak dikenali");
+  return data.Data;
 }
-async function loadCrypto(){
+
+function renderCryptoGrid(){
   const grid = document.getElementById('cryptoGrid');
+  const filtered = activeCryptoCat === "ALL"
+    ? cryptoNewsCache
+    : cryptoNewsCache.filter(item => (item.categories||"").toUpperCase().includes(activeCryptoCat.toUpperCase()));
+  if(filtered.length === 0){
+    grid.innerHTML = `<div class="infobox">Tidak ada berita untuk kategori ini saat ini.</div>`;
+    return;
+  }
+  grid.innerHTML = filtered.slice(0,18).map(item => newsCardHTML({
+    title: item.title,
+    url: item.url,
+    source: (item.source_info && item.source_info.name) || item.source || "Crypto",
+    time: timeAgo(item.published_on),
+    image: item.imageurl,
+    excerpt: item.body ? item.body.slice(0,140) + (item.body.length>140 ? "…" : "") : "",
+    tags: (item.categories||"").split("|").filter(Boolean)
+  })).join("");
+}
+
+async function loadCryptoNews(){
+  const grid = document.getElementById('cryptoGrid');
+  grid.innerHTML = `<div class="loading">Memuat berita crypto…</div>`;
   try{
-    const results = await Promise.all(CRYPTO_PAIRS.map(p => fetchCrypto(p).then(closes => ({p, closes}))));
-    grid.innerHTML = results.map(({p, closes}) => cardHTML({
-      name: p.label, sub: "Candle 1 jam · Binance", decimals: decimalsForPrice(closes[closes.length-1]),
-      closes, lastLabel: "Live · " + nowStr()
-    })).join("");
+    cryptoNewsCache = await fetchCryptoNews();
+    renderCryptoGrid();
     document.getElementById('cryptoLastUpdate').textContent = nowStr();
   }catch(err){
-    grid.innerHTML = `<div class="errbox">Gagal memuat crypto: ${err.message}</div>`;
+    grid.innerHTML = `<div class="errbox">Gagal memuat berita crypto: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadCryptoNews()">Coba lagi</button></div>`;
   }
 }
 
-/* ============ FOREX (Twelve Data w/ key, else Frankfurter daily) ============ */
-const FOREX_PAIRS = [
-  { label:"EUR/USD", td:"EUR/USD", base:"EUR", quote:"USD" },
-  { label:"GBP/USD", td:"GBP/USD", base:"GBP", quote:"USD" },
-  { label:"USD/JPY", td:"USD/JPY", base:"USD", quote:"JPY" },
-  { label:"USD/CHF", td:"USD/CHF", base:"USD", quote:"CHF" },
-  { label:"AUD/USD", td:"AUD/USD", base:"AUD", quote:"USD" },
-  { label:"USD/CAD", td:"USD/CAD", base:"USD", quote:"CAD" },
-  { label:"NZD/USD", td:"NZD/USD", base:"NZD", quote:"USD" },
-];
-function getApiKey(){ return localStorage.getItem('td_api_key') || ""; }
-function saveApiKey(){
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if(!val){ return; }
-  localStorage.setItem('td_api_key', val);
-  reflectKeyStatus();
-  loadForex();
-}
-function clearApiKey(){
-  localStorage.removeItem('td_api_key');
-  document.getElementById('apiKeyInput').value = "";
-  reflectKeyStatus();
-  loadForex();
-}
-function reflectKeyStatus(){
-  const key = getApiKey();
-  document.getElementById('keyStatus').textContent = key ? "✓ Key tersimpan" : "";
-  document.getElementById('clearKeyBtn').style.display = key ? "inline-block" : "none";
-  document.getElementById('apiKeyInput').value = key;
-  document.getElementById('forexTag').textContent = key ? "● live · Twelve Data" : "delayed · harian";
-  document.getElementById('forexTag').className = "tag " + (key ? "live" : "delayed");
-}
-function fmtDateISO(d){ return d.toISOString().slice(0,10); }
+document.getElementById('cryptoChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if(!chip) return;
+  document.querySelectorAll('#cryptoChips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  activeCryptoCat = chip.dataset.cat;
+  renderCryptoGrid();
+});
 
-async function fetchForexTwelveData(pair, key){
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(pair.td)}&interval=15min&outputsize=100&apikey=${key}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if(data.status === "error" || !data.values) throw new Error(data.message || "Gagal ambil " + pair.label);
-  const closes = data.values.map(v => parseFloat(v.close)).reverse(); // API returns newest first
-  return closes;
+/* ============ FOREX NEWS (ForexLive RSS via CORS proxy, no key) ============ */
+async function fetchForexNews(){
+  const rssUrl = "https://www.forexlive.com/feed/news";
+  const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(rssUrl);
+  const res = await fetch(proxyUrl);
+  if(!res.ok) throw new Error("Gagal ambil berita forex (status " + res.status + ")");
+  const xmlText = await res.text();
+  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+  const items = Array.from(doc.querySelectorAll("item"));
+  if(items.length === 0) throw new Error("Feed forex kosong / format berubah");
+  return items.map(node => {
+    const title = node.querySelector("title") ? node.querySelector("title").textContent : "";
+    const link = node.querySelector("link") ? node.querySelector("link").textContent : "";
+    const pubDate = node.querySelector("pubDate") ? node.querySelector("pubDate").textContent : "";
+    let desc = node.querySelector("description") ? node.querySelector("description").textContent : "";
+    desc = stripHTML(desc);
+    let img = "";
+    const media = node.getElementsByTagName("media:content")[0] || node.getElementsByTagName("enclosure")[0];
+    if(media) img = media.getAttribute("url") || "";
+    const catNodes = Array.from(node.querySelectorAll("category"));
+    const tags = catNodes.map(c => c.textContent).filter(Boolean);
+    return {
+      title, url: link,
+      time: pubDate ? timeAgo(new Date(pubDate)) : "",
+      excerpt: desc,
+      image: img,
+      tags
+    };
+  });
 }
-async function fetchForexFrankfurter(pair){
-  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-130);
-  const url = `https://api.frankfurter.dev/v1/${fmtDateISO(start)}..${fmtDateISO(end)}?from=${pair.base}&to=${pair.quote}`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Gagal ambil " + pair.label);
-  const data = await res.json();
-  const dates = Object.keys(data.rates).sort();
-  return dates.map(d => data.rates[d][pair.quote]);
-}
-async function loadForex(){
+
+async function loadForexNews(){
   const grid = document.getElementById('forexGrid');
-  const key = getApiKey();
-  grid.innerHTML = `<div class="loading">Memuat data forex…</div>`;
+  grid.innerHTML = `<div class="loading">Memuat berita forex…</div>`;
   try{
-    const results = await Promise.all(FOREX_PAIRS.map(async p => {
-      const closes = key ? await fetchForexTwelveData(p, key) : await fetchForexFrankfurter(p);
-      return { p, closes };
-    }));
-    const decimals = (p) => p.quote === "JPY" ? 3 : 5;
-    grid.innerHTML = results.map(({p, closes}) => cardHTML({
-      name: p.label,
-      sub: key ? "Candle 15 menit · Twelve Data" : "Kurs harian · ECB",
-      decimals: decimals(p),
-      closes,
-      lastLabel: key ? "Update ~15 menit · " + nowStr() : "Update 1x/hari · " + nowStr()
+    const items = await fetchForexNews();
+    grid.innerHTML = items.slice(0,18).map(item => newsCardHTML({
+      title: item.title,
+      url: item.url,
+      source: "ForexLive",
+      time: item.time,
+      image: item.image,
+      excerpt: item.excerpt.slice(0,140) + (item.excerpt.length>140 ? "…" : ""),
+      tags: item.tags
     })).join("");
     document.getElementById('forexLastUpdate').textContent = nowStr();
   }catch(err){
-    grid.innerHTML = `<div class="errbox">Gagal memuat forex: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadForex()">Coba lagi</button></div>`;
+    grid.innerHTML = `<div class="errbox">Gagal memuat berita forex: ${err.message}<br><button class="ghost" style="margin-top:10px" onclick="loadForexNews()">Coba lagi</button></div>`;
   }
 }
 
 /* ============ Init & auto-refresh ============ */
-reflectKeyStatus();
-loadCrypto();
-loadForex();
-setInterval(loadCrypto, 30 * 1000);           // crypto: tiap 30 detik
-setInterval(loadForex, 10 * 60 * 1000);        // forex: tiap 10 menit (jaga kuota API gratis)
+loadCryptoNews();
+loadForexNews();
+setInterval(loadCryptoNews, 2 * 60 * 1000);   // crypto news: tiap 2 menit
+setInterval(loadForexNews, 5 * 60 * 1000);    // forex news: tiap 5 menit
 </script>
 </body>
 </html>
